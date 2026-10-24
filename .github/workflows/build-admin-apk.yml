@@ -1,0 +1,54 @@
+name: Build admin APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['index.html', '.github/workflows/build-admin-apk.yml']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Prepare admin app
+        run: |
+          mkdir -p admin-app/www
+          grep -q 'supabase.co' index.html
+          sed 's/MODE:"customer"/MODE:"admin"/' index.html > admin-app/www/index.html
+          grep -q 'MODE:"admin"' admin-app/www/index.html
+          echo '{"name":"wasselni-admin","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^8.0.0","@capacitor/core":"^8.0.0"},"devDependencies":{"@capacitor/cli":"^8.0.0"}}' > admin-app/package.json
+          echo '{"appId":"com.wasselni.admin","appName":"Wasselni Admin","webDir":"www","server":{"androidScheme":"https"}}' > admin-app/capacitor.config.json
+      - name: Create Android project
+        working-directory: admin-app
+        run: |
+          npm install
+          npx cap add android
+          sed -i 's|<string name="app_name">[^<]*</string>|<string name="app_name">وصّلني المدير</string>|; s|<string name="title_activity_main">[^<]*</string>|<string name="title_activity_main">وصّلني المدير</string>|' android/app/src/main/res/values/strings.xml
+          npx cap sync android
+      - name: Build APK
+        working-directory: admin-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasselni-admin-apk
+          path: admin-app/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK as direct download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp admin-app/android/app/build/outputs/apk/debug/app-debug.apk wasselni-admin.apk
+          gh release delete admin-latest --yes --cleanup-tag || true
+          gh release create admin-latest wasselni-admin.apk --title "Wasselni Admin" --notes "Download wasselni-admin.apk and install it on the admin phone."
