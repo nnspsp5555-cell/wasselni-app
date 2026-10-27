@@ -309,6 +309,7 @@
     y.cart = Array.isArray(y.cart) ? y.cart : [];
     y.myOrders = Array.isArray(y.myOrders) ? y.myOrders : [];
     y.favs = Array.isArray(y.favs) ? y.favs : [];
+    y.acct = (y.acct && typeof y.acct === 'object') ? y.acct : {};
     y.role = MODE === 'admin' ? (session ? 'admin' : null) : 'customer';
     var ca = MODE === 'customer' ? cacheLoad() : null;
     if (ca && ca[0] && ca[1]) {
@@ -322,7 +323,7 @@
     S.latest = l;
     if (!ON) return l;
     // لا نخزّن منتجات/طلبات الآخرين محلياً: فقط السلة وبيانات الزبون ومعرّفات طلباته
-    return { cart: l.cart, profile: l.profile, myOrders: l.myOrders, favs: l.favs };
+    return { cart: l.cart, profile: l.profile, myOrders: l.myOrders, favs: l.favs, acct: l.acct };
   }
 
   /* ---------------- الدخول والخروج (المدير) ---------------- */
@@ -537,6 +538,16 @@
     return b;
   }
   function failResync(e) { S.notify(msg(e)); pullCatalog(true).catch(noop); return false; }
+  function setAcct(p) {
+    setState(function (s) {
+      var a = Object.assign({}, s.acct || {}, p), prof = Object.assign({}, s.profile || {});
+      if ('name' in p) prof.name = a.name || prof.name || '';
+      if ('phone' in p) { var m = String(a.phone || '').replace(/\D/g, ''); prof.phone = /^07\d{9}$/.test(m) ? m : prof.phone || ''; }
+      var d = (a.addresses || []).filter(function (x) { return x.id === a.defaultId; })[0];
+      if (d) prof.address = d.text;
+      return Object.assign({}, s, { acct: a, profile: prof });
+    });
+  }
   function toggleFav(id) {
     setState(function (s) {
       var f = (s.favs || []).slice(), i = f.indexOf(id);
@@ -689,6 +700,7 @@
 
   function Account(props) {
     var admin = props.role === 'admin';
+    if (!admin && WS.CustomerAccount) return h(WS.CustomerAccount, null);
     var p = props.profile || {};
     if (admin) {
       return h(React_Fragment(),
@@ -717,7 +729,7 @@
     updateShop: updateShop, toggleOffer: toggleOffer, setCommission: setCommission,
     bind: bind, cat: { add: catAdd, update: catUpdate, remove: catRemove, move: catMove },
     banner: { add: bannerAdd, update: bannerUpdate, remove: bannerRemove }, shop: { add: shopAdd, remove: shopRemove },
-    removeOrders: removeOrders, toggleFav: toggleFav,
+    removeOrders: removeOrders, toggleFav: toggleFav, setAcct: setAcct,
     img: img, h: h, LoginView: LoginView, Account: Account
   };
 })();
@@ -735,6 +747,26 @@
 
   /* ---------- أنماط ---------- */
   var css = [
+    '.wl-acc{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;margin:-14px -14px 14px;padding:calc(env(safe-area-inset-top) + 22px) 16px 22px;border-radius:0 0 28px 28px;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 6px 16px #f26a1b40}',
+    '.wl-av{width:92px;height:92px;border-radius:50%;background:#ffffff33 center/cover no-repeat;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;overflow:hidden}',
+    '.wl-av img{width:100%;height:100%;object-fit:cover}',
+    '.wl-accbtn{display:flex;gap:8px}',
+    '.wl-accbtn .btn{background:#ffffff2e;color:#fff;border:0;padding:8px 14px;font-size:13px}',
+    '.wl-ph{display:flex;gap:8px;align-items:flex-end}',
+    '.wl-ph .field{flex:1;margin:0}',
+    '.wl-wa{background:#25d366!important;color:#fff!important;border:0}',
+    '.wl-err{color:var(--danger);font-size:12.5px;margin:-4px 0 8px}',
+    '.wl-addr{display:flex;flex-direction:column;gap:6px}',
+    '.wl-lbl{display:inline-block;border-radius:99px;background:var(--brand-soft);color:var(--brand-dark);font-weight:700;font-size:12px;padding:3px 12px}',
+    '.wl-chips{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}',
+    '.wl-chips button{border:2px solid var(--line);background:#fff;border-radius:99px;padding:7px 16px;font-weight:700;color:var(--muted)}',
+    '.wl-chips button.on{border-color:var(--brand);color:var(--brand-dark);background:var(--brand-soft)}',
+    '.wl-map{position:relative;height:250px;border-radius:16px;overflow:hidden;background:#e8ecea;touch-action:none;margin-bottom:8px;user-select:none}',
+    '.wl-map img{position:absolute;width:256px;height:256px;max-width:none;-webkit-user-drag:none;pointer-events:none}',
+    '.wl-pin{position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);color:#e03131;pointer-events:none;filter:drop-shadow(0 2px 2px #0004)}',
+    '.wl-zoom{position:absolute;top:8px;inset-inline-start:8px;display:flex;flex-direction:column;gap:6px}',
+    '.wl-zoom button{width:36px;height:36px;border-radius:10px;border:0;background:#fff;font-size:20px;font-weight:700;box-shadow:0 1px 4px #0003}',
+    '.wl-attr{position:absolute;bottom:2px;inset-inline-end:6px;font-size:10px;background:#ffffffcc;padding:0 4px;border-radius:4px}',
     '.pcard{position:relative}',
     '.wl-hero{margin:-14px -14px 14px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;padding:calc(env(safe-area-inset-top) + 16px) 16px 18px;border-radius:0 0 28px 28px;box-shadow:0 6px 16px #f26a1b40}',
     '.wl-hrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}',
@@ -1136,6 +1168,155 @@
       tab[0] === 'cats' ? h(CatsPanel) : tab[0] === 'banners' ? h(BannersPanel) : h(ShopsPanel));
   }
 
+
+  /* ---------- حساب الزبون ---------- */
+  function digitsEn(s) { return String(s || '').replace(/[٠-٩]/g, function (d) { return d.charCodeAt(0) - 1632; }).replace(/[۰-۹]/g, function (d) { return d.charCodeAt(0) - 1776; }); }
+  // يحوّل أي صيغة عراقية (07xx، 7xx، +964، 00964) إلى الصيغة الدولية ويتحقق من صحتها
+  function normIQ(raw) {
+    var d = digitsEn(raw).replace(/[^\d]/g, '');
+    if (!d) return null;
+    if (d.indexOf('00964') === 0) d = d.slice(2);
+    if (d.indexOf('964') === 0) d = d.slice(3);
+    else if (d.charAt(0) === '0') d = d.slice(1);
+    if (!/^7[3-9]\d{8}$/.test(d)) return null;
+    return { intl: '964' + d, local: '0' + d };
+  }
+  var LBL = ['البيت', 'العمل', 'أخرى'];
+
+  function MapPicker(p) {
+    var R_ = R(), ref = R_.useRef(null), wh = R_.useState([340, 250]);
+    var v = R_.useState({ lat: p.lat || 30.5081, lng: p.lng || 47.7835, z: p.lat ? 17 : 13 }), drag = R_.useRef(null);
+    R_.useEffect(function () { if (ref.current) wh[1]([ref.current.clientWidth, ref.current.clientHeight]); }, []);
+    R_.useEffect(function () { if (p.jump) v[1](function (o) { return { lat: p.jump.lat, lng: p.jump.lng, z: 17 }; }); }, [p.jump]);
+    var s = v[0], N = 256 * Math.pow(2, s.z);
+    var cx = (s.lng + 180) / 360 * N, sin = Math.sin(s.lat * Math.PI / 180), cy = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * N;
+    function toLL(x, y, z) { var n = 256 * Math.pow(2, z); return { lng: x / n * 360 - 180, lat: Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI }; }
+    var W = wh[0][0], H = wh[0][1], tiles = [], x0 = Math.floor((cx - W / 2) / 256), x1 = Math.floor((cx + W / 2) / 256), y0 = Math.floor((cy - H / 2) / 256), y1 = Math.floor((cy + H / 2) / 256), max = Math.pow(2, s.z);
+    for (var ty = y0; ty <= y1; ty++) for (var tx = x0; tx <= x1; tx++) {
+      if (ty < 0 || ty >= max) continue;
+      var wx = ((tx % max) + max) % max;
+      tiles.push(h('img', { key: s.z + '/' + tx + '/' + ty, alt: '', loading: 'lazy', decoding: 'async', src: 'https://tile.openstreetmap.org/' + s.z + '/' + wx + '/' + ty + '.png', style: { left: Math.round(W / 2 + tx * 256 - cx), top: Math.round(H / 2 + ty * 256 - cy) } }));
+    }
+    function down(e) { drag.current = { x: e.clientX, y: e.clientY, cx: cx, cy: cy }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {} }
+    function move(e) { var d = drag.current; if (!d) return; var ll = toLL(d.cx - (e.clientX - d.x), d.cy - (e.clientY - d.y), s.z); v[1]({ lat: Math.max(-85, Math.min(85, ll.lat)), lng: ll.lng, z: s.z }); }
+    function up() { if (drag.current) { drag.current = null; p.onChange(+s.lat.toFixed(6), +s.lng.toFixed(6)); } }
+    function zoom(dz) { var z = Math.max(3, Math.min(19, s.z + dz)); v[1]({ lat: s.lat, lng: s.lng, z: z }); p.onChange(+s.lat.toFixed(6), +s.lng.toFixed(6)); }
+    return h('div', { className: 'wl-map', ref: ref, onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerCancel: up, 'data-lat': s.lat.toFixed(6), 'data-lng': s.lng.toFixed(6) }, tiles,
+      h('div', { className: 'wl-pin' }, h('svg', { width: 34, height: 34, viewBox: '0 0 24 24', fill: 'currentColor' }, h('path', { d: 'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z' }))),
+      h('div', { className: 'wl-zoom' }, h('button', { type: 'button', onPointerDown: function (e) { e.stopPropagation(); }, onClick: function () { zoom(1); }, 'aria-label': 'تكبير' }, '+'), h('button', { type: 'button', onPointerDown: function (e) { e.stopPropagation(); }, onClick: function () { zoom(-1); }, 'aria-label': 'تصغير' }, '−')),
+      h('div', { className: 'wl-attr' }, '© OpenStreetMap'));
+  }
+
+  function AddressForm(p) {
+    var R_ = R(), a0 = p.init || {}, st = B().ct(), notify = st.notify || function () {};
+    var known = LBL.indexOf(a0.label) >= 0 ? a0.label : (a0.label ? 'أخرى' : 'البيت');
+    var lab = R_.useState(known), custom = R_.useState(LBL.indexOf(a0.label) >= 0 || !a0.label ? '' : a0.label),
+      text = R_.useState(a0.text || ''), pos = R_.useState(a0.lat != null ? { lat: a0.lat, lng: a0.lng } : null),
+      map = R_.useState(!!(a0.lat != null)), jump = R_.useState(null), gb = R_.useState(false);
+    function gps() {
+      if (!navigator.geolocation) { notify('الموقع غير مدعوم في هذا المتصفح'); return; }
+      gb[1](true);
+      navigator.geolocation.getCurrentPosition(function (r) {
+        var c = { lat: +r.coords.latitude.toFixed(6), lng: +r.coords.longitude.toFixed(6) };
+        pos[1](c); jump[1](c); map[1](true); gb[1](false);
+      }, function () { gb[1](false); notify('تعذّر تحديد موقعك. فعّل الـGPS وامنح الإذن أو اختر من الخريطة'); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+    }
+    function save() {
+      var label = lab[0] === 'أخرى' ? (custom[0].trim() || 'أخرى') : lab[0];
+      if (text[0].trim().length < 4) { notify('اكتب العنوان بوضوح (المنطقة والشارع وأقرب نقطة دالة)'); return; }
+      p.onSave({ id: a0.id || ('a' + Date.now().toString(36)), label: label, text: text[0].trim(), lat: pos[0] ? pos[0].lat : null, lng: pos[0] ? pos[0].lng : null });
+    }
+    return h('div', { className: 'card' }, h('b', null, p.init ? 'تعديل العنوان' : 'عنوان جديد'),
+      h('div', { className: 'wl-chips', style: { marginTop: 10 } }, LBL.map(function (l) { return h('button', { key: l, type: 'button', className: lab[0] === l ? 'on' : '', onClick: function () { lab[1](l); } }, l); })),
+      lab[0] === 'أخرى' ? h(Field, { label: 'اسم العنوان (مثلاً: بيت الأهل)', value: custom[0], onChange: custom[1] }) : null,
+      h(Field, { label: 'العنوان (المنطقة، الشارع، أقرب نقطة دالة)', area: true, value: text[0], onChange: text[1] }),
+      h('div', { className: 'wl-acts', style: { marginTop: 0, marginBottom: 10 } },
+        h('button', { type: 'button', className: 'btn sm', disabled: gb[0], onClick: gps }, gb[0] ? 'جارٍ التحديد…' : '📍 تحديد موقعي (GPS)'),
+        h('button', { type: 'button', className: 'btn sm ghost', onClick: function () { map[1](!map[0]); } }, map[0] ? 'إخفاء الخريطة' : '🗺️ تعديل على الخريطة')),
+      pos[0] ? h('div', { className: 'small muted', style: { marginBottom: 6 } }, 'الموقع المحفوظ: ' + pos[0].lat.toFixed(5) + '، ' + pos[0].lng.toFixed(5)) : null,
+      map[0] ? h(Fr(), null, h(MapPicker, { lat: pos[0] && pos[0].lat, lng: pos[0] && pos[0].lng, jump: jump[0], onChange: function (la, ln) { pos[1]({ lat: la, lng: ln }); } }),
+        h('div', { className: 'small muted', style: { marginBottom: 10 } }, 'حرّك الخريطة بإصبعك ليستقر الدبوس على بيتك')) : null,
+      pos[0] ? h('button', { type: 'button', className: 'btn sm danger', style: { marginBottom: 10 }, onClick: function () { pos[1](null); } }, 'إزالة الموقع الجغرافي') : null,
+      h('div', { className: 'wl-row' }, h('button', { className: 'btn grow', onClick: save }, 'حفظ العنوان'), h('button', { className: 'btn ghost', onClick: p.onCancel }, 'إلغاء')));
+  }
+
+  function CustomerAccount() {
+    var R_ = R(), b = B(), st = b.ct(), notify = st.notify || function () {}, a = st.acct || {};
+    var name = R_.useState(a.name || (st.profile && st.profile.name) || ''), phone = R_.useState(a.phone || (st.profile && st.profile.phone) || ''),
+      err = R_.useState(''), edit = R_.useState(null), busy = R_.useState(false);
+    var addrs = a.addresses || [];
+    var saveInfo = function () {
+      var ph = phone[0].trim();
+      if (ph && !normIQ(ph)) { err[1]('رقم الهاتف غير صحيح. مثال: 07901234567'); return false; }
+      err[1]('');
+      WS.setAcct({ name: name[0].trim(), phone: ph ? normIQ(ph).local : '' });
+      if (ph) phone[1](normIQ(ph).local);
+      notify('تم حفظ بياناتك'); return true;
+    };
+    function wa() {
+      var n = normIQ(phone[0]);
+      if (!phone[0].trim()) { err[1]('أدخل رقم الهاتف أولاً'); return; }
+      if (!n) { err[1]('رقم غير صالح لواتساب. استخدم رقماً عراقياً مثل 07901234567'); return; }
+      err[1](''); window.open('https://wa.me/' + n.intl, '_blank', 'noopener');
+    }
+    function contact() {
+      if (!(navigator.contacts && navigator.contacts.select)) { notify('اختيار جهة اتصال غير مدعوم في هذا المتصفح. أدخل الرقم يدوياً'); return; }
+      navigator.contacts.select(['tel'], { multiple: false }).then(function (r) {
+        var t = r && r[0] && r[0].tel && r[0].tel[0]; if (!t) return;
+        var n = normIQ(t); if (!n) { err[1]('الرقم المختار ليس رقماً عراقياً صالحاً، أدخله يدوياً'); return; }
+        err[1](''); phone[1](n.local);
+      }).catch(function () {});
+    }
+    function pickAvatar(e) {
+      var f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+      busy[1](true); b.f1(f, 256, 0.8).then(function (d) { WS.setAcct({ avatar: d }); }).catch(function () { notify('تعذّر قراءة الصورة'); }).then(function () { busy[1](false); });
+    }
+    function saveAddr(ad) {
+      var l = addrs.filter(function (x) { return x.id !== ad.id; }), i = addrs.map(function (x) { return x.id; }).indexOf(ad.id);
+      var next = addrs.slice(); if (i >= 0) next[i] = ad; else next.push(ad);
+      WS.setAcct({ addresses: next, defaultId: a.defaultId && next.some(function (x) { return x.id === a.defaultId; }) ? a.defaultId : ad.id });
+      edit[1](null); notify('تم حفظ العنوان');
+    }
+    function delAddr(ad) {
+      if (!window.confirm('حذف عنوان «' + ad.label + '»؟')) return;
+      var next = addrs.filter(function (x) { return x.id !== ad.id; });
+      WS.setAcct({ addresses: next, defaultId: a.defaultId === ad.id ? (next[0] && next[0].id) : a.defaultId });
+    }
+    var initial = (name[0] || a.name || '').trim().charAt(0);
+    return h(Fr(), null,
+      h('div', { className: 'wl-acc' },
+        h('div', { className: 'wl-av' }, a.avatar ? h('img', { src: a.avatar, alt: '' }) : (initial || h(b.C, { name: 'user', size: 40 }))),
+        h('b', { style: { fontSize: 18 } }, a.name || 'حسابي'),
+        h('div', { className: 'wl-accbtn' },
+          h('label', { className: 'btn sm', style: { display: 'inline-block' } }, busy[0] ? 'جارٍ التحميل…' : (a.avatar ? 'تغيير الصورة' : 'اختيار من المعرض'), h('input', { type: 'file', accept: 'image/*', hidden: true, onChange: pickAvatar })),
+          a.avatar ? h('button', { className: 'btn sm', onClick: function () { WS.setAcct({ avatar: undefined }); } }, 'حذف الصورة') : null)),
+      h('div', { className: 'card' }, h('div', { className: 'bold', style: { marginBottom: 10 } }, 'المعلومات الشخصية'),
+        h(Field, { label: 'الاسم الكامل', value: name[0], onChange: name[1] }),
+        h('div', { className: 'wl-ph' }, h(Field, { label: 'رقم الهاتف (اختياري)', type: 'tel', value: phone[0], onChange: function (v) { phone[1](v); err[1](''); } }),
+          h('button', { className: 'btn wl-wa', type: 'button', onClick: wa, 'aria-label': 'فتح واتساب' }, 'واتساب')),
+        err[0] ? h('div', { className: 'wl-err' }, err[0]) : null,
+        h('div', { className: 'wl-acts', style: { marginTop: 0 } },
+          h('button', { className: 'btn sm ghost', type: 'button', onClick: contact }, '👤 اختيار من جهات الاتصال'),
+          h('button', { className: 'btn sm', type: 'button', onClick: saveInfo }, 'حفظ المعلومات'))),
+      h('div', { className: 'wl-sec', style: { marginTop: 4 } }, h('h3', null, 'عناوين التوصيل')),
+      edit[0] === 'new' ? h(AddressForm, { onSave: saveAddr, onCancel: function () { edit[1](null); } })
+        : h('button', { className: 'btn block', style: { marginBottom: 12 }, onClick: function () { edit[1]('new'); } }, '＋ إضافة عنوان'),
+      addrs.length === 0 && edit[0] !== 'new' ? h('div', { className: 'empty' }, 'لا توجد عناوين محفوظة. أضف عنوان البيت أو العمل ليُعبَّأ تلقائياً عند الطلب.') : null,
+      addrs.map(function (ad) {
+        if (edit[0] === ad.id) return h(AddressForm, { key: ad.id, init: ad, onSave: saveAddr, onCancel: function () { edit[1](null); } });
+        var def = ad.id === a.defaultId;
+        return h('div', { key: ad.id, className: 'card wl-addr' },
+          h('div', { className: 'wl-row' }, h('span', { className: 'wl-lbl' }, ad.label), def ? h('span', { className: 'tag' }, 'افتراضي') : null),
+          h('div', null, ad.text),
+          ad.lat != null ? h('a', { className: 'small', style: { color: 'var(--brand-dark)', fontWeight: 700 }, target: '_blank', rel: 'noopener', href: 'https://www.openstreetmap.org/?mlat=' + ad.lat + '&mlon=' + ad.lng + '#map=17/' + ad.lat + '/' + ad.lng }, '📍 عرض الموقع على الخريطة') : null,
+          h('div', { className: 'wl-acts' },
+            def ? null : h('button', { className: 'btn sm', onClick: function () { WS.setAcct({ defaultId: ad.id }); notify('تم تعيين العنوان الافتراضي'); } }, 'تعيين افتراضي'),
+            h('button', { className: 'btn sm ghost', onClick: function () { edit[1](ad.id); } }, 'تعديل'),
+            h('button', { className: 'btn sm danger', onClick: function () { delAddr(ad); } }, 'حذف')));
+      }),
+      h('div', { className: 'small muted', style: { textAlign: 'center', margin: '14px 0' } }, 'الدفع نقداً عند الاستلام. بياناتك محفوظة على هذا الجهاز فقط ولا تُرسل إلا عند تأكيد طلب.'));
+  }
+
   /* ---------- تنظيف سجل الطلبات (المدير) ---------- */
   function OrderCleanup(p) {
     var done = (p.orders || []).filter(function (o) { return o.status === 'delivered' || o.status === 'cancelled'; });
@@ -1151,6 +1332,7 @@
         h('button', { className: 'btn sm danger', onClick: function () { run(done, 'المُسلَّمة والملغية'); } }, 'حذف الكل (' + done.length + ')')));
   }
 
+  WS.CustomerAccount = CustomerAccount;
   WS.Home = Home; WS.AdminStore = AdminStore; WS.OrderCleanup = OrderCleanup;
   WS.CategoriesPage = CategoriesPage; WS.FavoritesPage = FavoritesPage; WS.Heart = Heart; WS.HeartIcon = HeartIcon; WS.CartFab = CartFab;
 })();
