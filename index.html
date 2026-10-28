@@ -29,7 +29,7 @@
     on_the_way: 'المندوب بالطريق', delivered: 'تم التسليم', cancelled: 'ملغي', picked_up: 'تم الاستلام', failed: 'تعذّر التسليم'
   };
   var noop = function () {};
-  var NEWST = MODE === 'courier' ? 'accepted' : 'new';
+  var NEWST = MODE === 'courier' ? '__none__' : 'new';
   var enc = encodeURIComponent;
 
   /* ---------------- الجلسة (للمدير فقط) ---------------- */
@@ -138,7 +138,8 @@
     WS_PAID_LOCKED: 'سُجّل المبلغ بعد التسليم ولا يمكن تعديله',
     WS_COURIER_NO_USER: 'تعذّر إنشاء حساب الدخول، راجع إعدادات Auth',
     WS_COURIER_EXISTS: 'هذا المندوب مسجّل مسبقاً',
-    WS_CANNOT_UNASSIGN: 'لا يمكن إلغاء الإسناد بعد استلام الطلب'
+    WS_CANNOT_UNASSIGN: 'لا يمكن إلغاء الإسناد بعد استلام الطلب',
+    WS_OFFER_EXPIRED: 'انتهت مهلة الطلب أو أُسند لغيرك'
   };
   function msg(e) {
     var m = String((e && e.message) || '');
@@ -187,7 +188,9 @@
       createdAt: Date.parse(r.created_at), payment: r.payment || 'cash',
       rating: r.rating == null ? undefined : r.rating,
       courierId: r.courier_id || undefined, assignedBy: r.assigned_by || undefined,
-      cashCollected: r.cash_collected == null ? undefined : r.cash_collected, failReason: r.fail_reason || undefined
+      cashCollected: r.cash_collected == null ? undefined : r.cash_collected, failReason: r.fail_reason || undefined,
+      offerExpiresAt: r.offer_expires_at ? Date.parse(r.offer_expires_at) : undefined,
+      courierAccepted: !!r.courier_accepted_at, rejectedCount: (r.rejected_by || []).length
     };
   }
 
@@ -310,12 +313,13 @@
     S.set = set; S.notify = notify || noop;
     var every = MODE === 'admin' ? 5000 : MODE === 'courier' ? 8000 : (Number(C.CUSTOMER_POLL_MS) || 15000);
     var timer = setInterval(cycle, every);
-    var onVis = function () { if (!document.hidden) { S.force = true; cycle(); } };
+    var ot = MODE === 'courier' ? setInterval(function () { if (!document.hidden && session) pullOffers(); }, 3000) : null;
+    var onVis = function () { if (!document.hidden) { S.force = true; cycle(); pullOffers(); } };
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('online', onVis);
     cycle();
     return function () {
-      clearInterval(timer);
+      clearInterval(timer); if (ot) clearInterval(ot);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('online', onVis);
     };
@@ -372,6 +376,7 @@
     var tok = session && session.access_token;
     saveSession(null);
     S.seen = null;
+    if (window.WS && WS.onOffers) WS.onOffers([]);
     if (!tok) return Promise.resolve();
     return fetch(URL_ + '/auth/v1/logout', { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + tok } })
       .catch(noop).then(noop);
@@ -751,13 +756,31 @@
     return after(on ? 'تم تفعيل التوزيع التلقائي' : 'تم إيقاف التوزيع التلقائي',
       rest('settings?id=eq.1', { method: 'PATCH', body: { auto_assign: !!on }, prefer: 'return=representation' }).then(must), pullSettings);
   }
-  function assignOrder(uid, cid) { return after('تم إسناد الطلب', rpc('admin_assign_order', { p_order: uid, p_courier: cid }), refreshOrders); }
+  function assignOrder(uid, cid) { return after('أُرسل الطلب للمندوب وأمامه مهلة قصيرة للرد', rpc('admin_assign_order', { p_order: uid, p_courier: cid }), refreshOrders); }
   function unassignOrder(uid) { return after('تم إلغاء الإسناد', rpc('admin_unassign_order', { p_order: uid }), refreshOrders); }
   function cStatus(uid, status, note) {
     return after('الحالة: ' + LABEL[status], rpc('courier_set_status', { p_order: uid, p_status: status, p_note: note || null }), refreshOrders);
   }
   function cPay(uid, amount) {
     return after('تم تسجيل المبلغ', rpc('courier_record_payment', { p_order: uid, p_amount: Math.round(amount) }), refreshOrders);
+  }
+  var offersBusy = false;
+  function pullOffers() {
+    if (MODE !== 'courier' || !session || offersBusy) return Promise.resolve();
+    offersBusy = true;
+    return rpc('courier_offers').then(function (rows) {
+      var t = Date.now();
+      var list = (rows || []).map(function (r) {
+        return { id: r.oid, no: 'W' + r.ono, shop: r.shop_name || '', total: r.total_amt, fee: r.fee, items: r.items, expiresAt: t + r.seconds_left * 1000 };
+      });
+      if (window.WS && WS.onOffers) WS.onOffers(list);
+    }).catch(noop).finally(function () { offersBusy = false; });
+  }
+  function cRespond(oid, accept) {
+    return rpc('courier_respond', { p_order: oid, p_accept: !!accept })
+      .then(function () { S.notify(accept ? 'تم قبول الطلب' : 'تم رفض الطلب'); return true; })
+      .catch(function (e) { S.notify(msg(e)); return false; })
+      .then(function (ok) { return Promise.all([pullOffers(), refreshOrders()]).then(function () { return ok; }); });
   }
   function cAvail(on) {
     setState(function (s) { return Object.assign({}, s, { me: s.me ? Object.assign({}, s.me, { available: !!on }) : s.me }); });
@@ -831,9 +854,9 @@
     bind: bind, cat: { add: catAdd, update: catUpdate, remove: catRemove, move: catMove },
     banner: { add: bannerAdd, update: bannerUpdate, remove: bannerRemove }, shop: { add: shopAdd, remove: shopRemove },
     removeOrders: removeOrders, toggleFav: toggleFav, setAcct: setAcct,
-    img: img, h: h, LoginView: LoginView, Account: Account, normPhone: normPhone,
+    img: img, h: h, LoginView: LoginView, Account: Account, normPhone: normPhone, beep: beep,
     courier: { add: courierAdd, update: courierUpdate, password: courierPassword, setAuto: setAutoAssign,
-      assign: assignOrder, unassign: unassignOrder, status: cStatus, pay: cPay, avail: cAvail }
+      assign: assignOrder, unassign: unassignOrder, respond: cRespond, status: cStatus, pay: cPay, avail: cAvail }
   };
 })();
 </script><script>/*
@@ -1468,7 +1491,14 @@
     '.wc-map{width:100%;height:190px;border:0;border-radius:12px;margin-top:8px;background:var(--line)}',
     '.wc-pay{display:flex;gap:8px;margin-top:10px;align-items:center}',
     '.wc-sec{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}',
-    '.wc-wa{background:#25d366!important;color:#fff!important}'
+    '.wc-wa{background:#25d366!important;color:#fff!important}',
+    '.wc-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px}',
+    '.wc-box{background:var(--card,#fff);color:var(--text,#222);border-radius:22px;padding:22px;width:100%;max-width:380px;text-align:center;box-shadow:0 10px 40px #0008}',
+    '.wc-ttl{font-size:20px;font-weight:800;margin-bottom:6px;color:var(--brand)}',
+    '.wc-timer{font-size:64px;font-weight:800;line-height:1;margin:12px 0;color:var(--brand)}',
+    '.wc-bar{height:8px;border-radius:99px;background:var(--line,#eee);overflow:hidden;margin-bottom:14px}',
+    '.wc-bar>div{height:100%;background:var(--brand);transition:width .2s linear}',
+    '.wc-waze{background:#33ccff!important;color:#06202b!important}'
   ].join('');
   document.head.appendChild(st);
 
@@ -1481,6 +1511,7 @@
     var lat = Number(o.lat), lng = Number(o.lng);
     var ll = o.lat != null && o.lng != null && isFinite(lat) && isFinite(lng);
     var live = LIVE.indexOf(o.status) >= 0;
+    var waze = ll ? 'https://waze.com/ul?ll=' + lat + ',' + lng + '&navigate=yes' : 'https://waze.com/ul?q=' + encodeURIComponent((o.address || '') + ' البصرة') + '&navigate=yes';
     var dir = ll ? 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '&travelmode=driving'
       : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((o.address || '') + ' البصرة');
     var map = ll ? 'https://www.openstreetmap.org/export/embed.html?bbox=' + [lng - 0.004, lat - 0.003, lng + 0.004, lat + 0.003].join(',') + '&layer=mapnik&marker=' + lat + ',' + lng : null;
@@ -1543,7 +1574,9 @@
       h('div', { className: 'wc-sec' },
         h('div', { className: 'small muted' }, 'العنوان'),
         h('div', null, o.address),
-        live ? h('a', { className: 'btn sm block', style: { marginTop: 8 }, href: dir, target: '_blank', rel: 'noreferrer' }, 'الاتجاهات') : null,
+        live ? h('div', { className: 'wc-acts' },
+          h('a', { className: 'btn sm', href: dir, target: '_blank', rel: 'noreferrer' }, 'خرائط جوجل'),
+          h('a', { className: 'btn sm wc-waze', href: waze, target: '_blank', rel: 'noreferrer' }, 'Waze')) : null,
         live && map ? h('iframe', { className: 'wc-map', src: map, loading: 'lazy', title: 'الخريطة' }) : null),
       o.status === 'failed' && o.failReason ? h('div', { className: 'wc-sec small', style: { color: 'var(--danger)' } }, 'سبب التعذّر: ' + o.failReason) : null,
       payBox, acts);
@@ -1579,25 +1612,30 @@
   /* ------------------------- المدير: إسناد طلب ------------------------- */
   function AssignBox(p) {
     var a = app(), o = p.order, cs = a.couriers || [], sel = R().useState('');
-    var cu = cs.filter(function (c) { return c.id === o.courierId; })[0];
+    var cu = cs.filter(function (c) { return c.id === o.courierId; })[0], nm = cu ? cu.name : '—';
     if (DONE.indexOf(o.status) >= 0) {
-      return o.courierId ? h('div', { className: 'muted small', style: { width: '100%' } }, 'المندوب: ' + (cu ? cu.name : '—')) : null;
+      return o.courierId ? h('div', { className: 'muted small', style: { width: '100%' } }, 'المندوب: ' + nm) : null;
     }
-    if (o.courierId) {
-      return h('div', { className: 'wc-as' },
-        h('span', { className: 'tag' }, 'المندوب: ' + (cu ? cu.name : '—')),
+    var pending = o.courierId && !o.courierAccepted;
+    var fresh = pending && o.offerExpiresAt && o.offerExpiresAt > Date.now();
+    var cancel = function (t) { return h('button', { className: 'btn sm danger', onClick: function () { window.confirm('إلغاء إسناد الطلب ' + o.id + '؟') && C.unassign(o.uid); } }, t); };
+    if (o.courierId && !pending) {
+      return h('div', { className: 'wc-as' }, h('span', { className: 'tag' }, 'المندوب: ' + nm),
         o.assignedBy === 'auto' ? h('span', { className: 'tag gray' }, 'تلقائي') : null,
-        o.status === 'accepted' ? h('button', { className: 'btn sm danger', onClick: function () { window.confirm('إلغاء إسناد الطلب ' + o.id + '؟') && C.unassign(o.uid); } }, 'إلغاء الإسناد') : null);
+        o.status === 'accepted' ? cancel('إلغاء الإسناد') : null);
     }
+    if (fresh) return h('div', { className: 'wc-as' }, h('span', { className: 'tag amber' }, 'بانتظار رد المندوب: ' + nm), cancel('إلغاء العرض'));
     if (['new', 'accepted'].indexOf(o.status) < 0) return null;
     var act = cs.filter(function (c) { return c.active; });
     return h('div', { className: 'wc-as' },
       h('span', { className: 'tag amber' }, 'بانتظار مندوب'),
+      pending ? h('span', { className: 'tag red' }, 'انتهت المهلة') : null,
+      o.rejectedCount > 0 ? h('span', { className: 'tag red' }, 'رفضه/لم يرد: ' + o.rejectedCount) : null,
       act.length ? h(Fr(), null,
         h('select', { value: sel[0], onChange: function (e) { sel[1](e.target.value); } },
           h('option', { value: '' }, 'اختر المندوب'),
           act.map(function (c) { return h('option', { key: c.id, value: c.id }, c.name + (c.available ? ' — متاح' : ' — غير متاح')); })),
-        h('button', { className: 'btn sm', disabled: !sel[0], onClick: function () { C.assign(o.uid, sel[0]); } }, 'إسناد'))
+        h('button', { className: 'btn sm', disabled: !sel[0], onClick: function () { C.assign(o.uid, sel[0]); } }, 'إرسال العرض'))
         : h('span', { className: 'muted small' }, 'لا يوجد مندوبون. أضفهم من لوحة المدير.'));
   }
 
@@ -1656,6 +1694,50 @@
         h('button', { className: 'btn block', disabled: bz[0], onClick: add }, bz[0] ? 'جارٍ الإضافة…' : 'إضافة المندوب')));
   }
 
+  /* ------------------------- نافذة عرض الطلب على المندوب (مهلة قبول/رفض) ------------------------- */
+  var ov = null, cur = null, tick = null, alertT = null, seen = {}, done = {};
+  function mk(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function buzz() { try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} try { WS.beep && WS.beep(); } catch (e) {} }
+  function hide() {
+    if (ov) { ov.remove(); ov = null; }
+    cur = null; clearInterval(tick); clearInterval(alertT); tick = alertT = null;
+  }
+  function show(o) {
+    hide(); cur = o;
+    var total = Math.max(1000, o.expiresAt - Date.now()), busy = false;
+    ov = mk('div', 'wc-ov'); ov.setAttribute('dir', 'rtl');
+    var box = mk('div', 'wc-box'), tm = mk('div', 'wc-timer', ''), bar = mk('div', 'wc-bar'), fill = mk('div'), row = mk('div', 'wc-acts');
+    var ok = mk('button', 'btn', 'قبول'), no = mk('button', 'btn danger', 'رفض');
+    bar.appendChild(fill);
+    function reply(acc) {
+      if (busy) return; busy = true; ok.disabled = no.disabled = true; done[o.id] = 1;
+      C.respond(o.id, acc).then(function () { if (cur && cur.id === o.id) hide(); });
+    }
+    ok.onclick = function () { reply(true); }; no.onclick = function () { reply(false); };
+    row.appendChild(ok); row.appendChild(no);
+    box.appendChild(mk('div', 'wc-ttl', 'طلب توصيل جديد'));
+    box.appendChild(mk('div', 'bold', o.no + (o.shop ? ' · ' + o.shop : '')));
+    box.appendChild(mk('div', 'muted small', 'المطلوب نقداً ' + money(o.total) + ' · أجرة التوصيل ' + money(o.fee) + ' · ' + o.items + ' صنف'));
+    box.appendChild(tm); box.appendChild(bar); box.appendChild(row);
+    ov.appendChild(box); document.body.appendChild(ov);
+    function paint() {
+      var ms = Math.max(0, cur ? cur.expiresAt - Date.now() : 0);
+      tm.textContent = String(Math.ceil(ms / 1000));
+      fill.style.width = Math.min(100, ms / total * 100) + '%';
+      if (ms <= 0) { done[o.id] = 1; hide(); }
+    }
+    paint(); tick = setInterval(paint, 200); alertT = setInterval(buzz, 2000);
+  }
+  function onOffers(list) {
+    list = (list || []).filter(function (x) { return !done[x.id]; });
+    if (!list.length) { hide(); return; }
+    var f = list[0];
+    if (cur && cur.id === f.id) { cur.expiresAt = f.expiresAt; return; }
+    if (!seen[f.id]) { seen[f.id] = 1; buzz(); }
+    show(f);
+  }
+
+  WS.onOffers = onOffers;
   WS.CourierTasks = CourierTasks; WS.CourierAccount = CourierAccount;
   WS.AssignBox = AssignBox; WS.DispatchBar = DispatchBar; WS.CouriersPanel = CouriersPanel;
 })();
