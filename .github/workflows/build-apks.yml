@@ -1,0 +1,78 @@
+name: Build APKs
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['index.html', '.github/workflows/build-apks.yml']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: admin
+            cap: Admin
+            ar: وصّلني المدير
+            title: Wasselni Admin
+            deps: '{"name":"wasselni-admin","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^8.0.0","@capacitor/core":"^8.0.0"},"devDependencies":{"@capacitor/cli":"^8.0.0"}}'
+          - kind: courier
+            cap: Courier
+            ar: مندوب وصّلني
+            title: Wasselni Courier
+            deps: '{"name":"wasselni-courier","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^8.0.0","@capacitor/cli":"^8.0.0","@capacitor/core":"^8.0.0"}}'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Setup Android SDK
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0"
+      - name: Prepare app
+        run: |
+          mkdir -p ${{ matrix.kind }}-app/www
+          grep -q 'supabase.co' index.html
+          sed 's/MODE:"customer"/MODE:"${{ matrix.kind }}"/' index.html > ${{ matrix.kind }}-app/www/index.html
+          grep -q 'MODE:"${{ matrix.kind }}"' ${{ matrix.kind }}-app/www/index.html
+          echo '${{ matrix.deps }}' > ${{ matrix.kind }}-app/package.json
+          echo '{"appId":"com.wasselni.${{ matrix.kind }}","appName":"Wasselni ${{ matrix.cap }}","webDir":"www","server":{"androidScheme":"https"}}' > ${{ matrix.kind }}-app/capacitor.config.json
+      - name: Create Android project
+        working-directory: ${{ matrix.kind }}-app
+        run: |
+          npm install
+          npx cap add android
+          sed -i 's|<string name="app_name">[^<]*</string>|<string name="app_name">${{ matrix.ar }}</string>|; s|<string name="title_activity_main">[^<]*</string>|<string name="title_activity_main">${{ matrix.ar }}</string>|' android/app/src/main/res/values/strings.xml
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q ACCESS_FINE_LOCATION "$M" || sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <application|' "$M"
+          grep -q ACCESS_FINE_LOCATION "$M"
+          sed -i -E "s/versionCode( *=)? *[0-9]+/versionCode\1 ${{ github.run_number }}/" android/app/build.gradle
+          npx cap sync android
+      - name: Build APK
+        working-directory: ${{ matrix.kind }}-app/android
+        env:
+          KS_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then mkdir -p ~/.android && echo "$KS_B64" | base64 -d > ~/.android/debug.keystore; fi
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | head -3 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasselni-${{ matrix.kind }}-apk
+          path: ${{ matrix.kind }}-app/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK as direct download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp ${{ matrix.kind }}-app/android/app/build/outputs/apk/debug/app-debug.apk wasselni-${{ matrix.kind }}.apk
+          gh release delete ${{ matrix.kind }}-latest --yes --cleanup-tag || true
+          gh release create ${{ matrix.kind }}-latest wasselni-${{ matrix.kind }}.apk --title "${{ matrix.title }}" --notes "Download wasselni-${{ matrix.kind }}.apk and install it on the ${{ matrix.kind }} phone."
