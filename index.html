@@ -1685,7 +1685,14 @@
     '.wc-home{position:relative;margin:-14px -14px -96px;overflow:hidden;background:#e6ebe8}',
     '.wc-home .wm{position:absolute;inset:0}',
     '.wc-sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:26px 26px 0 0;box-shadow:0 -4px 22px #0003;padding:6px 16px 14px;max-height:74%;overflow-y:auto;z-index:8;direction:rtl}',
-    '.wc-grip{display:block;width:48px;height:5px;border-radius:5px;background:#cfd6d3;margin:4px auto 10px;border:0;padding:0}',
+    '.wc-grip{display:flex;align-items:center;justify-content:center;height:30px;margin:-6px -16px 2px;touch-action:none;cursor:grab;position:sticky;top:-6px;background:#fff;z-index:3;border-radius:26px 26px 0 0}',
+    '.wc-grip i{display:block;width:56px;height:6px;border-radius:6px;background:#bfc8c4}',
+    '.wc-min{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 0 4px}',
+    '.wc-min b{font-size:15px}.wc-min .wc-chip{padding:5px 14px;font-size:14px}.wc-min .o{color:' + ORANGE + ';font-weight:800}',
+    '.wc-nav{display:flex;gap:10px;margin:4px 0 12px}',
+    '.wc-nav a{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:13px 8px;font-weight:800;font-size:15px;text-decoration:none}',
+    '.wc-nav .g{flex:1.3;background:#eaf5ed;border:1px solid #bfe0c9;color:' + GREEN + '}',
+    '.wc-nav .w{flex:1;background:#33ccff;color:#06202b;border:1px solid #1fb6e8}',
     '.wc-r1{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--line)}',
     '.wc-fee small{display:block;color:var(--muted);font-size:13px}',
     '.wc-fee b{font-size:21px;color:' + ORANGE + ';font-weight:800}',
@@ -1960,13 +1967,19 @@
     return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
   }
 
+  function wazeUrl(o, shop) {
+    var sl = shopLL(shop), c = custLL(o), t = (o.status === 'accepted' && sl) ? sl : c;
+    if (t) return 'https://waze.com/ul?ll=' + t.lat + ',' + t.lng + '&navigate=yes';
+    var q = (o.status === 'accepted' && shop) ? ((shop.name || '') + ' ' + (shop.area || '') + ' البصرة') : ((o.address || '') + ' البصرة');
+    return 'https://waze.com/ul?q=' + encodeURIComponent(q) + '&navigate=yes';
+  }
+
   function OrderPanel(p) {
     var o = p.o, shop = p.shop, X = R();
     var pay = X.useState(String(o.total)), busy = X.useState(false), more = X.useState(false);
     var ph = WS.normPhone(o.customerPhone);
     var live = LIVE.indexOf(o.status) >= 0;
     var c = custLL(o);
-    var waze = c ? 'https://waze.com/ul?ll=' + c.lat + ',' + c.lng + '&navigate=yes' : 'https://waze.com/ul?q=' + encodeURIComponent((o.address || '') + ' البصرة') + '&navigate=yes';
     function go(status, note) {
       if (busy[0]) return;
       busy[1](true);
@@ -2028,15 +2041,16 @@
             ph ? h('a', { className: 'wa', href: 'https://wa.me/964' + ph.slice(1), target: '_blank', rel: 'noreferrer' }, 'واتساب', ico(I.chat, 17)) : null,
             h('a', { href: 'tel:' + o.customerPhone }, 'اتصال', ico(I.phone, 17))))),
       h('div', { className: 'row between', style: { margin: '0 0 8px' } }, h('span', { className: 'bold' }, 'المطلوب نقداً من الزبون'), h('span', { className: 'bold', style: { color: ORANGE } }, money(o.total))),
-      live ? h('a', { className: 'wc-gm', href: dirUrl(o, shop), target: '_blank', rel: 'noreferrer' },
-        h('span', null, ico(I.map, 22), o.status === 'accepted' && shopLL(shop) ? 'فتح الاتجاهات إلى المطعم في خرائط جوجل' : 'فتح الاتجاهات في خرائط جوجل'), ico(I.chev, 20)) : null,
+      live ? h('div', { className: 'wc-nav' },
+        h('a', { className: 'g', href: dirUrl(o, shop), target: '_blank', rel: 'noreferrer' }, ico(I.map, 21), 'خرائط جوجل'),
+        h('a', { className: 'w', href: wazeUrl(o, shop), target: '_blank', rel: 'noreferrer' }, ico(I.nav, 20), 'Waze')) : null,
       payBox, main,
       o.status === 'failed' && o.failReason ? h('div', { className: 'small', style: { color: 'var(--danger)', marginTop: 8 } }, 'سبب التعذّر: ' + o.failReason) : null,
       h('button', { className: 'wc-tog', style: { marginTop: 8 }, onClick: function () { more[1](!more[0]); } }, more[0] ? 'إخفاء تفاصيل الطلب ▴' : 'تفاصيل الطلب والأصناف ▾'),
       more[0] ? h('div', { className: 'wc-lines' },
         (o.lines || []).map(function (l, i) { return h('div', { key: i, className: 'row between small' }, h('span', null, l.qty + ' × ' + l.name), h('span', null, money(l.price * l.qty))); }),
         h('div', { className: 'muted small', style: { marginTop: 6 } }, when(o.createdAt)),
-        live ? h('a', { className: 'btn sm wc-waze', style: { display: 'inline-block', marginTop: 8 }, href: waze, target: '_blank', rel: 'noreferrer' }, 'Waze') : null) : null);
+        null) : null);
   }
 
   /* خريطة الطلب (المطعم 1 · الزبون 2 · خط السير) */
@@ -2053,7 +2067,7 @@
     var X = R(), a = app(), me = a.me, orders = a.orders || [], shops = a.shops || [];
     var live = orders.filter(function (o) { return DONE.indexOf(o.status) < 0; }).sort(function (x, y) { return x.createdAt - y.createdAt; });
     var selS = X.useState(window.__wcSel || null), layer = X.useState('std'), box = X.useRef(null), sh = X.useRef(null), hs = X.useState(0), sheetH = X.useState(0);
-    var fitS = X.useState(1), focus = X.useState(null), gps = X.useState(null), gbusy = X.useState(false), grip = X.useState(true);
+    var fitS = X.useState(1), focus = X.useState(null), gps = X.useState(null), gbusy = X.useState(false), grip = X.useState(window.__wcGrip !== false), gd = X.useRef(null);
     var o = live.filter(function (x) { return x.uid === selS[0]; })[0] || live[0] || null;
     var shop = o ? shops.filter(function (x) { return x.id === o.shopId; })[0] : null;
     var om = useOrderMap(o, shop);
@@ -2075,7 +2089,7 @@
       var ro = window.ResizeObserver ? new ResizeObserver(f) : null; if (ro) ro.observe(el);
       return function () { if (ro) ro.disconnect(); };
     }, [o ? o.uid : 0, hs[0]]);
-    var fitKey = (o ? o.uid : 'x') + '|' + om.pts.map(function (q) { return q.lat + ',' + q.lng; }).join(';') + '|' + (sheetH[0] > 0 ? 1 : 0) + '|' + fitS[0];
+    var fitKey = (o ? o.uid : 'x') + '|' + om.pts.map(function (q) { return q.lat + ',' + q.lng; }).join(';') + '|' + (sheetH[0] > 200 ? 2 : sheetH[0] > 0 ? 1 : 0) + '|' + fitS[0];
     var pts = om.pts.concat(gps[0] && !om.pts.length ? [gps[0]] : []);
     function locate() {
       if (gbusy[0]) return; gbusy[1](true);
@@ -2099,10 +2113,13 @@
         })) : null,
         notes.length ? h('div', { className: 'wm-note', style: { top: live.length > 1 ? 58 : 10, left: 70, right: 56 } }, notes) : null),
       h('div', { className: 'wc-sheet', ref: sh },
-        h('button', { className: 'wc-grip', 'aria-label': 'تصغير/تكبير', onClick: function () { grip[1](!grip[0]); } }),
-        o ? (grip[0] ? h(OrderPanel, { key: o.uid + o.status, o: o, shop: shop }) : h('div', { className: 'wc-r1', style: { border: 0 } },
-          h('div', { className: 'wc-fee' }, h('small', null, 'أجرة التوصيل'), h('b', null, money(o.deliveryFee))), h('span', { className: 'wc-chip' }, h('i'), LBL[o.status] || o.status),
-          h('div', { className: 'wc-no' }, h('small', null, 'رقم الطلب'), h('b', null, '# ' + String(o.id).replace(/^W/, '')))))
+        h('div', { className: 'wc-grip', role: 'button', 'aria-label': 'تصغير/تكبير',
+          onPointerDown: function (e) { gd.current = { y: e.clientY, done: false }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {} },
+          onPointerMove: function (e) { var g = gd.current; if (!g || g.done) return; var dy = e.clientY - g.y; if (dy > 25) { g.done = true; window.__wcGrip = false; grip[1](false); } else if (dy < -25) { g.done = true; window.__wcGrip = true; grip[1](true); } },
+          onPointerUp: function (e) { var g = gd.current; gd.current = null; if (g && !g.done && Math.abs(e.clientY - g.y) < 8) { window.__wcGrip = !grip[0]; grip[1](!grip[0]); } },
+          onPointerCancel: function () { gd.current = null; } }, h('i')),
+        o ? (grip[0] ? h(OrderPanel, { key: o.uid + o.status, o: o, shop: shop }) : h('div', { className: 'wc-min' },
+          h('b', null, '# ' + String(o.id).replace(/^W/, '')), h('span', { className: 'wc-chip' }, h('i'), LBL[o.status] || o.status), h('span', { className: 'o' }, money(o.deliveryFee))))
           : h('div', { className: 'wc-empty' }, h('b', null, 'لا توجد مهام حالياً'),
             h('span', { className: 'muted' }, me && me.available ? 'ستظهر هنا فور إسناد طلب إليك.' : 'أنت غير متاح حالياً. فعّل «متاح لاستلام الطلبات» من الأعلى.'))));
   }
