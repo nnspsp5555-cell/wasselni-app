@@ -240,7 +240,7 @@
           banners: r[4] ? r[4].map(bannerOf) : (s.banners || []), topIds: Array.isArray(r[5]) ? r[5] : (s.topIds || []),
           catsReady: !!r[3], catsVer: Date.now(), loaded: true });
       });
-      if (MODE === 'customer') cacheSave(r);
+      if (MODE !== 'courier') cacheSave(r);
     });
   }
   function pullSettings() {
@@ -291,6 +291,7 @@
     if (S.running || document.hidden) return Promise.resolve();
     S.running = true;
     S.tick++;
+    if (MODE === 'admin') locFlush();
     var job;
     if (MODE !== 'customer') {
       if (!session) { S.running = false; return Promise.resolve(); }
@@ -340,7 +341,7 @@
     y.acct = (y.acct && typeof y.acct === 'object') ? y.acct : {};
     y.role = MODE === 'customer' ? 'customer' : (session ? MODE : null);
     y.couriers = [];
-    var ca = MODE === 'customer' ? cacheLoad() : null;
+    var ca = MODE !== 'courier' ? cacheLoad() : null;
     if (ca && ca[0] && ca[1]) {
       if (ca[3]) applyCats(ca[3].map(catOf));
       y.shops = ca[0].map(shopOf); y.products = ca[1].map(prodOf); y.offers = (ca[2] || []).map(offerOf);
@@ -666,21 +667,52 @@
         touch(); S.notify('تمت إضافة المتجر'); return true;
       }).catch(function (e) { S.notify(msg(e)); return false; });
   }
-  // حفظ موقع متجر واحد فقط (إحداثيات حقيقية) مع التحقق من أن الخادم حفظها فعلاً
-  function shopLocSave(id, lat, lng, address) {
-    lat = Number(lat); lng = Number(lng);
-    if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) { S.notify('إحداثيات غير صالحة'); return Promise.resolve(false); }
-    lat = +lat.toFixed(6); lng = +lng.toFixed(6);
-    touch();
-    var body = { lat: lat, lng: lng, location_updated_at: new Date().toISOString() };
+  // ---- حفظ موقع متجر واحد (إحداثيات حقيقية). بدون إنترنت: يُحفظ على الجهاز ويُرسل تلقائياً عند عودته ----
+  var LQ = 'wasselni_loc_queue_v1', lqBusy = false, lqFails = {};
+  function lqGet() { try { return JSON.parse(localStorage.getItem(LQ) || '{}') || {}; } catch (e) { return {}; } }
+  function lqSet(o) { try { Object.keys(o).length ? localStorage.setItem(LQ, JSON.stringify(o)) : localStorage.removeItem(LQ); } catch (e) {} }
+  function isNet(e) { return navigator.onLine === false || !!(e && (e.code === 'WS_NETWORK' || e instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(e.message || '')))); }
+  function locPending(id) { var q = lqGet()[id]; return q && isFinite(q.lat) && isFinite(q.lng) ? q : null; }
+  function patchLoc(id, lat, lng, address, ts) {
+    var body = { lat: lat, lng: lng, location_updated_at: ts || new Date().toISOString() };
     if (address) body.address = String(address).slice(0, 300);
     return rest('shops?id=eq.' + enc(id), { method: 'PATCH', body: body, prefer: 'return=representation' }).then(function (r) {
       must(r);
       var row = r[0];
       if (!('lat' in row) || Math.abs(Number(row.lat) - lat) > 1e-6 || Math.abs(Number(row.lng) - lng) > 1e-6) throw new Error('WS_LOC_NOT_SAVED');
       setState(function (s) { return Object.assign({}, s, { shops: s.shops.map(function (x) { return x.id === id ? Object.assign({}, x, shopOf(row)) : x; }) }); });
+      return row;
+    });
+  }
+  function locFlush() {
+    if (lqBusy || !session || navigator.onLine === false) return Promise.resolve();
+    var q = lqGet(), ids = Object.keys(q).filter(function (i) { return (lqFails[i] || 0) < 3; });
+    if (!ids.length) return Promise.resolve();
+    lqBusy = true;
+    return ids.reduce(function (p, id) {
+      return p.then(function () {
+        var it = q[id];
+        return patchLoc(id, Number(it.lat), Number(it.lng), it.address, it.ts).then(function () {
+          var q2 = lqGet(); delete q2[id]; lqSet(q2); touch(); S.notify('تمت مزامنة موقع المتجر مع قاعدة البيانات');
+        }).catch(function (e) { if (isNet(e)) throw e; lqFails[id] = (lqFails[id] || 0) + 1; if (lqFails[id] >= 3) S.notify(msg(e)); });
+      });
+    }, Promise.resolve()).catch(noop).then(function () { lqBusy = false; });
+  }
+  function shopLocSave(id, lat, lng, address) {
+    lat = Number(lat); lng = Number(lng);
+    if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) { S.notify('إحداثيات غير صالحة'); return Promise.resolve(false); }
+    lat = +lat.toFixed(6); lng = +lng.toFixed(6);
+    touch();
+    var ts = new Date().toISOString();
+    function queue() {
+      var q = lqGet(); q[id] = { lat: lat, lng: lng, address: address || null, ts: ts }; lqSet(q); delete lqFails[id];
+      S.notify('لا يوجد إنترنت — حُفظ الموقع على الجهاز وسيُرسل تلقائياً عند عودة الإنترنت'); return true;
+    }
+    if (navigator.onLine === false) return Promise.resolve(queue());
+    return patchLoc(id, lat, lng, address, ts).then(function () {
+      var q = lqGet(); if (q[id]) { delete q[id]; lqSet(q); }
       touch(); S.notify('تم حفظ موقع المتجر'); return true;
-    }).catch(function (e) { S.notify(msg(e)); return false; });
+    }).catch(function (e) { if (isNet(e)) return queue(); S.notify(msg(e)); return false; });
   }
   function shopRemove(id) {
     touch();
@@ -872,7 +904,7 @@
     updateProduct: updateProduct, addProduct: addProduct, deleteProduct: deleteProduct,
     updateShop: updateShop, toggleOffer: toggleOffer, setCommission: setCommission,
     bind: bind, cat: { add: catAdd, update: catUpdate, remove: catRemove, move: catMove },
-    banner: { add: bannerAdd, update: bannerUpdate, remove: bannerRemove }, shop: { add: shopAdd, remove: shopRemove, saveLoc: shopLocSave },
+    banner: { add: bannerAdd, update: bannerUpdate, remove: bannerRemove }, shop: { add: shopAdd, remove: shopRemove, saveLoc: shopLocSave, locPending: locPending, locFlush: locFlush },
     removeOrders: removeOrders, toggleFav: toggleFav, setAcct: setAcct,
     img: img, h: h, LoginView: LoginView, Account: Account, normPhone: normPhone, beep: beep,
     courier: { add: courierAdd, update: courierUpdate, password: courierPassword, setAuto: setAutoAssign,
@@ -1739,6 +1771,18 @@
     '.wc-lm header{background:var(--brand);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 14px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}',
     '.wc-lm header b{font-size:17px}',
     '.wc-lm .wm{flex:1;min-height:240px}',
+    '.wc-seg{display:flex;gap:6px;background:#fff;border-bottom:1px solid var(--line);padding:10px 12px}',
+    '.wc-seg button{flex:1;border:0;border-radius:12px;padding:11px;font-weight:700;background:#eef1ef;color:#5b6761}',
+    '.wc-seg button.on{background:var(--brand);color:#fff}',
+    '.wc-gps{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px 16px;text-align:center}',
+    '.wc-orb{width:140px;height:140px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;border:2px solid var(--line)}',
+    '.wc-orb.on{animation:wcp 1.2s infinite}@keyframes wcp{0%,100%{box-shadow:0 0 0 0 #f26a1b55}50%{box-shadow:0 0 0 18px #f26a1b00}}',
+    '.wc-gs{font-size:17px;font-weight:700}',
+    '.wc-gc{display:flex;gap:28px;justify-content:center;direction:ltr}.wc-gc small{display:block;color:var(--muted);font-size:12px;direction:rtl}.wc-gc b{font-size:22px;font-variant-numeric:tabular-nums}',
+    '.wc-ga{font-size:13px;color:#4c5853;line-height:1.5}',
+    '.wc-notes{width:100%;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:start;font-size:13px;line-height:1.7;color:#4c5853;margin-top:auto}',
+    '.wc-notes b{display:block;color:var(--text);margin-bottom:2px;font-size:15px}',
+    '.wc-bot{background:#fff;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);box-shadow:0 -3px 14px #0002}',
     '.wc-lb{background:#fff;padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);box-shadow:0 -3px 14px #0002}',
     '.wc-lb .addr{font-weight:700;font-size:14px;line-height:1.5;min-height:21px}',
     '.wc-lb .co{direction:ltr;text-align:right;color:var(--muted);font-size:13px;margin:2px 0 8px;font-variant-numeric:tabular-nums}',
@@ -2159,15 +2203,42 @@
         : h('div', { className: 'empty' }, me && me.available ? 'لا توجد مهام مسندة إليك الآن. ستظهر هنا فور إسنادها.' : 'أنت غير متاح حالياً. فعّل «متاح» لتصلك مهام جديدة.'));
   }
 
-  /* ------------------------- المدير: تحديد موقع المتجر (GPS أو يدوي) ------------------------- */
+  /* ------------------------- المدير: تحديد موقع المتجر (GPS بدون إنترنت أو يدوي) ------------------------- */
   var BASRA = { lat: 30.5081, lng: 47.7835 };
+  var onl = function () { return navigator.onLine !== false; };
+  // قراءة GPS مع اختيار أدق قراءة (لا تحتاج إنترنت)
+  function watchBest(onProg, done, bad) {
+    if (!navigator.geolocation) { bad('الموقع غير مدعوم في هذا الجهاز/المتصفح'); return function () {}; }
+    if (window.isSecureContext === false) { bad('تحديد الموقع يتطلب اتصالاً آمناً (HTTPS)'); return function () {}; }
+    var best = null, id = null, t = null, fin = false;
+    function stop() { fin = true; clearTimeout(t); try { navigator.geolocation.clearWatch(id); } catch (e) {} }
+    function finish() { if (fin) return; stop(); if (best) done(best); else bad('انتهت مهلة تحديد الموقع، أعد المحاولة في مكان مفتوح'); }
+    id = navigator.geolocation.watchPosition(function (r) {
+      if (fin) return;
+      var c = r.coords;
+      if (!best || c.accuracy < best.accuracy) best = { lat: c.latitude, lng: c.longitude, accuracy: c.accuracy };
+      onProg(best);
+      if (best.accuracy <= 10) finish();
+    }, function (er) {
+      if (fin) return; stop();
+      if (best) { done(best); return; }
+      bad(er && er.code === 1 ? 'تم رفض إذن الموقع. فعّله من إعدادات التطبيق/المتصفح ثم اضغط «تحديث الموقع»'
+        : er && er.code === 3 ? 'انتهت مهلة تحديد الموقع، أعد المحاولة في مكان مفتوح'
+        : 'تعذّر تحديد موقعك (إشارة GPS غير متاحة)');
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    t = setTimeout(finish, 15000);
+    return stop;
+  }
   function LocModal(p) {
-    var X = R(), shop = p.shop, a = app(), saved = hasLL(shop) ? { lat: Number(shop.lat), lng: Number(shop.lng) } : null;
-    var cur = X.useState(saved || BASRA), dirty = X.useState(false), src = X.useState(saved ? 'saved' : ''), msg = X.useState(null), addr = X.useState(shop.address || ''), busy = X.useState(false), gb = X.useState(false);
-    var focus = X.useState(null), acc = X.useState(null), geoT = X.useRef(null), geoSeq = X.useRef(0), lay = X.useState('std');
+    var X = R(), shop = p.shop, pend = WS.shop.locPending(shop.id);
+    var saved = pend ? { lat: pend.lat, lng: pend.lng } : (hasLL(shop) ? { lat: Number(shop.lat), lng: Number(shop.lng) } : null);
+    var tab = X.useState('gps'), cur = X.useState(saved), dirty = X.useState(false), src = X.useState(saved ? 'saved' : ''), msg = X.useState(null);
+    var addr = X.useState(pend ? (pend.address || '') : (shop.address || '')), busy = X.useState(false), gb = X.useState(false), acc = X.useState(null);
+    var focus = X.useState(null), geoT = X.useRef(null), geoSeq = X.useRef(0), stopRef = X.useRef(null), lay = X.useState('std');
     function reverse(ll) {
       clearTimeout(geoT.current);
       var seq = ++geoSeq.current;
+      if (!onl()) { addr[1](''); return; }
       addr[1]('…');
       geoT.current = setTimeout(function () {
         fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&accept-language=ar&lat=' + ll.lat + '&lon=' + ll.lng)
@@ -2175,45 +2246,64 @@
           .catch(function () { if (seq === geoSeq.current) addr[1](''); });
       }, 800);
     }
-    X.useEffect(function () { if (saved && !shop.address) reverse(saved); return function () { clearTimeout(geoT.current); }; }, []);
-    function moved(v) { var ll = { lat: +v.lat.toFixed(6), lng: +v.lng.toFixed(6) }; cur[1](ll); dirty[1](true); src[1]('manual'); acc[1](null); msg[1](null); reverse(ll); }
-    function useGps() {
-      if (gb[0]) return; gb[1](true); msg[1](null);
-      getPos(function (r) {
-        gb[1](false);
-        var ll = { lat: +r.coords.latitude.toFixed(6), lng: +r.coords.longitude.toFixed(6) };
-        cur[1](ll); dirty[1](true); src[1]('gps'); acc[1](Math.round(r.coords.accuracy || 0)); focus[1]({ key: Date.now(), lat: ll.lat, lng: ll.lng, z: 18 }); reverse(ll);
-        if (r.coords.accuracy > 100) msg[1]({ t: 'دقة الـGPS ضعيفة (±' + Math.round(r.coords.accuracy) + ' م). حرّك الدبوس يدوياً أو أعد المحاولة في مكان مفتوح.' });
-      }, function (m) { gb[1](false); msg[1]({ t: m }); });
+    function refresh() {
+      if (gb[0]) return;
+      gb[1](true); msg[1](null);
+      if (stopRef.current) stopRef.current();
+      stopRef.current = watchBest(function (b) { acc[1](Math.round(b.accuracy)); cur[1]({ lat: +b.lat.toFixed(6), lng: +b.lng.toFixed(6) }); dirty[1](true); src[1]('gps'); },
+        function (b) {
+          gb[1](false);
+          var ll = { lat: +b.lat.toFixed(6), lng: +b.lng.toFixed(6) };
+          cur[1](ll); dirty[1](true); src[1]('gps'); acc[1](Math.round(b.accuracy)); focus[1]({ key: Date.now(), lat: ll.lat, lng: ll.lng, z: 18 }); reverse(ll);
+          if (b.accuracy > 50) msg[1]({ t: 'دقة الـGPS ضعيفة (±' + Math.round(b.accuracy) + ' م). اخرج لمكان مفتوح واضغط «تحديث الموقع» للحصول على دقة أفضل.' });
+        },
+        function (m) { gb[1](false); msg[1]({ t: m }); });
     }
+    X.useEffect(function () { refresh(); return function () { if (stopRef.current) stopRef.current(); clearTimeout(geoT.current); }; }, []);
+    function moved(v) { var ll = { lat: +v.lat.toFixed(6), lng: +v.lng.toFixed(6) }; cur[1](ll); dirty[1](true); src[1]('manual'); acc[1](null); msg[1](null); reverse(ll); }
     function save() {
-      if (busy[0] || !dirty[0]) return;
-      if (navigator.onLine === false) { msg[1]({ t: 'لا يوجد اتصال بالإنترنت، لم يُحفظ الموقع.' }); return; }
+      if (busy[0] || !dirty[0] || !cur[0]) return;
+      if (stopRef.current) stopRef.current();
       busy[1](true);
       WS.shop.saveLoc(shop.id, cur[0].lat, cur[0].lng, addr[0] && addr[0] !== '…' ? addr[0] : null).then(function (ok) { busy[1](false); if (ok) p.onClose(); });
     }
-    var shown = dirty[0] ? cur[0] : saved;
+    var shown = cur[0];
+    var status = gb[0] ? 'جارٍ تحديد الموقع…' : (dirty[0] ? (src[0] === 'gps' ? 'تم الحصول على الموقع' : 'تم تحديد الموقع على الخريطة') : (saved ? 'الموقع المحفوظ حالياً' : 'اضغط «تحديث الموقع» لتحديد موقعك'));
+    var seg = function (id, t) { return h('button', { type: 'button', className: tab[0] === id ? 'on' : '', onClick: function () { tab[1](id); } }, t); };
     return h('div', { className: 'wc-lm' },
-      h('header', null, h('b', null, 'موقع «' + shop.name + '»'), h('button', { className: 'back', onClick: p.onClose }, 'إغلاق ✕')),
-      h(WMap, { pin: true, layer: lay[0], init: saved ? { lat: saved.lat, lng: saved.lng, z: 17 } : { lat: BASRA.lat, lng: BASRA.lng, z: 13 }, focus: focus[0], onUser: moved, zoomTop: 12 },
-        h('div', { className: 'wm-ctl', style: { top: 12 } },
-          h('button', { type: 'button', 'aria-label': 'نوع الخريطة', onPointerDown: function (e) { e.stopPropagation(); }, onClick: function () { lay[1](lay[0] === 'std' ? 'sat' : 'std'); } }, ico(I.layers, 24)))),
-      h('div', { className: 'wc-lb' },
-        msg[0] ? h('div', { className: 'wc-msg' }, msg[0].t) : null,
-        shown ? h(Fr(), null,
-          h('div', { className: 'small muted' }, dirty[0] ? (src[0] === 'gps' ? 'موقعك الحالي (GPS)' + (acc[0] != null ? ' · الدقة ±' + acc[0] + ' م' : '') : 'الموقع المحدد على الخريطة') + ' — لم يُحفظ بعد' : 'الموقع المحفوظ حالياً'),
-          h('div', { className: 'addr' }, addr[0] || 'العنوان غير متوفر (الإحداثيات تكفي للحفظ)'),
-          h('div', { className: 'co' }, shown.lat.toFixed(6) + ' , ' + shown.lng.toFixed(6)))
-          : h('div', { className: 'wc-msg' }, 'لم يُحدَّد موقع لهذا المتجر. حرّك الخريطة ليكون الدبوس على باب المتجر، أو اضغط «تحديد موقعي الحالي» وأنت داخل المتجر. لن يُحفظ شيء قبل ذلك.'),
+      h('header', null, h('b', null, 'تسجيل موقع «' + shop.name + '»'), h('button', { className: 'back', onClick: p.onClose }, 'إغلاق ✕')),
+      h('div', { className: 'wc-seg' }, seg('gps', 'باستخدام GPS'), seg('map', 'تحديد على الخريطة')),
+      tab[0] === 'gps'
+        ? h('div', { className: 'wc-gps' },
+          h('div', { className: 'wc-orb' + (gb[0] ? ' on' : '') }, ico(I.target, 64)),
+          h('div', { className: 'wc-gs' }, status),
+          shown ? h('div', { className: 'wc-gc' }, h('div', null, h('small', null, 'خط العرض'), h('b', null, shown.lat.toFixed(6))), h('div', null, h('small', null, 'خط الطول'), h('b', null, shown.lng.toFixed(6)))) : null,
+          acc[0] != null ? h('div', { className: 'muted small' }, 'الدقة ≈ ' + acc[0] + ' م') : null,
+          addr[0] && addr[0] !== '…' && shown ? h('div', { className: 'wc-ga' }, addr[0]) : null,
+          msg[0] ? h('div', { className: 'wc-msg', style: { width: '100%' } }, msg[0].t) : null,
+          h('div', { className: 'wc-notes' }, h('b', null, 'ملاحظات مهمة'),
+            h('div', null, '• تأكد من وجود إشارة GPS جيدة (اخرج لمكان مفتوح إذا كانت الدقة ضعيفة).'),
+            h('div', null, '• يفضّل تسجيل الموقع وأنت داخل المطعم أو أمام بابه.'),
+            h('div', null, '• تحديد الموقع لا يحتاج إنترنت: إذا لم يتوفر إنترنت يُحفظ على جهازك ويُرسل تلقائياً عند عودته.')))
+        : h(Fr(), null,
+          !onl() ? h('div', { className: 'wc-msg', style: { margin: 8 } }, 'الخريطة تحتاج إنترنت. استخدم تبويب GPS (يعمل بدون إنترنت).') : null,
+          h(WMap, { pin: true, layer: lay[0], init: shown ? { lat: shown.lat, lng: shown.lng, z: 17 } : { lat: BASRA.lat, lng: BASRA.lng, z: 13 }, focus: focus[0], onUser: moved, zoomTop: 12 },
+            h('div', { className: 'wm-ctl', style: { top: 12 } },
+              h('button', { type: 'button', 'aria-label': 'نوع الخريطة', onPointerDown: function (e) { e.stopPropagation(); }, onClick: function () { lay[1](lay[0] === 'std' ? 'sat' : 'std'); } }, ico(I.layers, 24)))),
+          shown ? h('div', { className: 'wc-lb', style: { boxShadow: 'none', paddingBottom: 6 } }, h('div', { className: 'addr' }, addr[0] && addr[0] !== '…' ? addr[0] : (addr[0] === '…' ? '…' : 'العنوان غير متوفر')),
+            h('div', { className: 'co' }, shown.lat.toFixed(6) + ' , ' + shown.lng.toFixed(6))) : h('div', { className: 'wc-msg', style: { margin: 8 } }, 'حرّك الخريطة ليكون الدبوس على باب المتجر.')),
+      h('div', { className: 'wc-bot' },
+        !dirty[0] && saved ? h('div', { className: 'small muted', style: { textAlign: 'center', marginBottom: 8 } }, pend ? 'موقع محفوظ على الجهاز بانتظار الإنترنت' : 'يوجد موقع محفوظ لهذا المتجر. حدّد موقعاً جديداً لتعديله.') : null,
         h('div', { className: 'wc-acts', style: { marginTop: 0 } },
-          h('button', { className: 'btn ghost', disabled: gb[0], onClick: useGps }, gb[0] ? 'جارٍ تحديد موقعك…' : 'تحديد موقعي الحالي GPS'),
-          h('button', { className: 'btn', disabled: !dirty[0] || busy[0], onClick: save }, busy[0] ? 'جارٍ الحفظ…' : 'حفظ الموقع'))));
+          h('button', { className: 'btn', disabled: !dirty[0] || busy[0] || gb[0], onClick: save }, busy[0] ? 'جارٍ الحفظ…' : 'حفظ الموقع'),
+          h('button', { className: 'btn ghost', disabled: gb[0], onClick: refresh }, gb[0] ? 'جارٍ التحديد…' : 'تحديث الموقع'))));
   }
   function ShopLocBtn(p) {
-    var X = R(), s = p.shop, open = X.useState(false), ok = hasLL(s);
+    var X = R(), s = p.shop, open = X.useState(false), pend = WS.shop.locPending(s.id), ok = hasLL(s) || !!pend, lat = pend ? pend.lat : s.lat, lng = pend ? pend.lng : s.lng;
     return h('div', { className: 'wc-loc' },
       s.locCol === false ? h('div', { className: 'wc-warn2', style: { width: '100%', margin: 0 } }, 'أعمدة الموقع غير موجودة في قاعدة البيانات. شغّل ملف shop_location_migration.sql في SQL Editor ثم أعد فتح اللوحة.') : null,
-      h('span', { className: 'tag ' + (ok ? '' : 'amber') }, ok ? 'الموقع محدد ✓ ' + Number(s.lat).toFixed(5) + ' , ' + Number(s.lng).toFixed(5) : 'موقع المتجر غير محدد'),
+      h('span', { className: 'tag ' + (ok ? '' : 'amber') }, ok ? 'الموقع محدد ✓ ' + Number(lat).toFixed(5) + ' , ' + Number(lng).toFixed(5) : 'موقع المتجر غير محدد'),
+      pend ? h('span', { className: 'tag amber' }, 'بانتظار الإنترنت للمزامنة') : null,
       h('button', { className: 'btn sm ghost', onClick: function () { open[1](true); } }, ico(I.pin, 15), ok ? ' تعديل الموقع' : ' تحديد موقع المتجر'),
       open[0] ? h(LocModal, { shop: s, onClose: function () { open[1](false); } }) : null);
   }
