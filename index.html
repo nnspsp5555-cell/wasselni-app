@@ -1842,7 +1842,47 @@
     '.wc-lb .co{direction:ltr;text-align:right;color:var(--muted);font-size:13px;margin:2px 0 8px;font-variant-numeric:tabular-nums}',
     '.wc-msg{font-size:12.5px;padding:8px 10px;border-radius:10px;background:#fff4e0;color:#8a4b00;margin-bottom:8px;line-height:1.5}',
     '.wc-msg.ok{background:#e6f4ea;color:#14602f}',
-    '.wc-warn2{background:#fff4e0;color:#8a4b00;border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:13px;line-height:1.6}'
+    '.wc-warn2{background:#fff4e0;color:#8a4b00;border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:13px;line-height:1.6}',
+    '.wq-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:0 14px;margin-bottom:12px;box-shadow:0 1px 6px #0000000d;color:#8a948f}',
+    '.wq-search input{flex:1;border:0;outline:0;background:none;font:inherit;padding:14px 0;color:var(--text);min-width:0}',
+    '.wq-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}',
+    '.wq-st{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 6px;text-align:center;box-shadow:0 1px 6px #0000000d}',
+    '.wq-st .ci{width:40px;height:40px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;justify-content:center}',
+    '.wq-st small{display:block;font-size:11.5px;color:var(--muted);line-height:1.4}',
+    '.wq-st b{display:block;font-size:14.5px;margin-top:2px;font-variant-numeric:tabular-nums}',
+    '.wq-row{display:flex;align-items:center;gap:10px;width:100%;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px #0000000d;text-align:start;font:inherit;color:inherit;cursor:pointer}',
+    '.wq-av{flex:none;width:48px;height:48px;border-radius:50%;background:#e9ecea;color:#9aa5a0;display:flex;align-items:center;justify-content:center}',
+    '.wq-mid{flex:1;min-width:0}',
+    '.wq-nm{font-weight:800;font-size:15.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.wq-ph{color:var(--muted);font-size:13px;direction:ltr;text-align:right;margin-top:2px}',
+    '.wq-end{flex:none;text-align:center}',
+    '.wq-bd{display:inline-block;background:var(--brand-soft,#fdeee4);color:var(--brand);font-weight:800;font-size:12px;padding:3px 10px;border-radius:99px}',
+    '.wq-am{font-weight:800;font-size:13px;margin-top:5px;color:var(--text);font-variant-numeric:tabular-nums}',
+    '.wq-call{flex:none;width:38px;height:38px;border-radius:50%;border:1.5px solid #bfe6cd;background:#fff;color:#16a34a;display:flex;align-items:center;justify-content:center;text-decoration:none}',
+    '.wq-chev{flex:none;color:#b3bbb7;transform:scaleX(-1)}',
+    '.wq-det{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px 14px 16px;text-align:center;margin-bottom:12px;box-shadow:0 1px 6px #0000000d}',
+    '.wq-det .wq-av{width:84px;height:84px;margin:0 auto 10px}',
+    '.wq-det h3{margin:0;font-size:20px;font-weight:800}',
+    '.wq-det .tl{display:inline-flex;align-items:center;gap:8px;direction:ltr;color:#4c5853;margin-top:4px;font-size:15px;text-decoration:none}',
+    '.wq-det .tl i{width:24px;height:24px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-style:normal}',
+    '.wq-acts{display:flex;gap:10px;margin:12px 0 16px}',
+    '.wq-acts>*{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;padding:13px 8px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-decoration:none}',
+    '.wq-b-del{background:#fff;color:#dc2626;border:1.5px solid #f2a9a9}',
+    '.wq-b-call{background:var(--brand);color:#fff;border:1.5px solid var(--brand)}',
+    '.wq-h{font-weight:800;font-size:17px;margin:4px 2px 10px;display:flex;justify-content:space-between;align-items:center}',
+    '.wq-h button{border:0;background:none;color:#dc2626;font:inherit;font-weight:700;font-size:13px;cursor:pointer;padding:4px}',
+    '.wq-or{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px #0000000d}',
+    '.wq-or .t{display:flex;justify-content:space-between;align-items:center;gap:8px}',
+    '.wq-or .no{font-weight:800;font-size:15px}',
+    '.wq-or .d{color:var(--muted);font-size:12.5px;margin-top:3px}',
+    '.wq-or .b{display:flex;justify-content:space-between;align-items:center;margin-top:8px}',
+    '.wq-or .b b{font-size:15px;font-variant-numeric:tabular-nums}',
+    '.wq-pill{font-weight:800;font-size:12.5px;padding:4px 12px;border-radius:99px;white-space:nowrap}',
+    '.wq-p-ok{background:#dcf5e5;color:#15803d}.wq-p-wait{background:#dbeafe;color:#1d4ed8}.wq-p-way{background:#fff1c9;color:#a16207}.wq-p-bad{background:#e9ecea;color:#5b6761}.wq-p-fail{background:#fde2e2;color:#b91c1c}',
+    '.wq-trash{display:inline-flex;align-items:center;gap:5px;border:1px solid #f2c4c4;background:#fff;color:#dc2626;border-radius:10px;padding:6px 10px;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer}',
+    '.wq-lock{color:var(--muted);font-size:12px}',
+    '.wq-back{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--brand);font:inherit;font-weight:800;padding:4px 2px;margin-bottom:8px;cursor:pointer}',
+    '.wq-ic{width:64px;height:64px;border-radius:18px;background:#fdeadf;color:#dc2626;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}'
   ].join('');
   document.head.appendChild(st);
 
@@ -1862,7 +1902,16 @@
     target: ['M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14z', 'M12 1v3', 'M12 20v3', 'M1 12h3', 'M20 12h3', 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'],
     bell: ['M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9', 'M13.7 21a2 2 0 0 1-3.4 0'],
     pin: ['M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z', 'M12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
-    send: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z'
+    send: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
+    user: ['M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2', 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z'],
+    users: ['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', 'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M23 21v-2a4 4 0 0 0-3-3.9', 'M16 3.1a4 4 0 0 1 0 7.8'],
+    cart: ['M9 22a1 1 0 1 0 0-2 1 1 0 0 0 0 2z', 'M20 22a1 1 0 1 0 0-2 1 1 0 0 0 0 2z', 'M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6'],
+    bag: ['M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z', 'M3 6h18', 'M16 10a4 4 0 0 1-8 0'],
+    cal: ['M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z', 'M16 2v4', 'M8 2v4', 'M3 10h18'],
+    box: ['M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7z', 'M3.3 7L12 12l8.7-5', 'M12 22V12'],
+    cash: ['M12 1v22', 'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'],
+    trash: ['M3 6h18', 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6', 'M10 11v6', 'M14 11v6', 'M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2'],
+    search: ['M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z', 'M21 21l-4.3-4.3']
   };
 
   function Logo() {
@@ -2397,6 +2446,7 @@
     }
     return h('div', { className: 'wc-ov', onClick: function (e) { if (e.target === e.currentTarget && !busy[0]) p.onClose(res[0]); } },
       h('div', { className: 'wc-box', style: { textAlign: 'start', maxHeight: '88vh', overflowY: 'auto' } },
+        res[0] ? null : h('div', { className: 'wq-ic' }, ico(I.trash, 32)),
         h('div', { className: 'wc-ttl', style: { color: res[0] ? (res[0].ok ? GREEN : '#c0392b') : '#c0392b' } }, res[0] ? (res[0].ok ? 'تم الحذف' : 'نتيجة الحذف') : p.title),
         res[0]
           ? h(Fr(), null, h('div', { style: { lineHeight: 1.8, fontSize: 14 } }, res[0].text),
@@ -2446,6 +2496,16 @@
         onConfirm: function () { return WS.cust.deleteOrders([o.id]).then(function (r) { applyResult(r); return report(r); }); }
       });
     }
+    function askMany(g, del) {
+      var sum = del.reduce(function (t, o) { return t + (Number(o.total) || 0); }, 0);
+      modal[1]({
+        title: 'حذف ' + del.length + ' طلب؟', confirmLabel: 'حذف الطلبات نهائياً',
+        check: 'أفهم أن الطلبات ستُحذف نهائياً ولا يمكن التراجع',
+        lines: [h('div', { key: 1 }, 'ستُحذف كل طلبات «', h('b', null, g.name || g.phone), '» المسلَّمة والملغية والمتعذَّرة (', h('b', null, del.length + ' طلب'), ' بإجمالي ', h('b', null, money(sum)), ') نهائياً من قاعدة البيانات.'),
+          h('div', { key: 2, className: 'small muted', style: { marginTop: 6 } }, 'الطلبات الجارية لا تُحذف.')],
+        onConfirm: function () { return WS.cust.deleteOrders(del.map(function (o) { return o.id; })).then(function (r) { applyResult(r); return report(r); }); }
+      });
+    }
     function askCustomer(g) {
       var del = g.orders.filter(function (o) { return DEL_OK.indexOf(o.status) >= 0; }), keep = g.orders.length - del.length;
       var sum = del.reduce(function (t, o) { return t + (Number(o.total) || 0); }, 0);
@@ -2463,40 +2523,61 @@
         }
       });
     }
-    var head = h('div', { className: 'row between', style: { marginBottom: 10 } },
-      h('div', { className: 'h2', style: { margin: 0 } }, 'الزبائن وطلباتهم' + (CU.rows ? ' (' + list.length + ')' : '')),
-      h('button', { className: 'btn sm ghost', disabled: CU.loading, onClick: function () { reload(true); } }, CU.loading ? 'جارٍ التحديث…' : 'تحديث'));
-    var body;
+    var pillOf = function (st) { return st === 'delivered' ? 'ok' : st === 'cancelled' ? 'bad' : st === 'failed' ? 'fail' : (st === 'picked_up' || st === 'on_the_way') ? 'way' : 'wait'; };
+    var pill = function (st) { return h('span', { className: 'wq-pill wq-p-' + pillOf(st) }, LBL[st] || st); };
+    var avatar = function (sz) { return h('div', { className: 'wq-av' }, ico(I.user, sz || 26)); };
+    var stat = function (ic, bg, fg, label, val) {
+      return h('div', { className: 'wq-st' }, h('div', { className: 'ci', style: { background: bg, color: fg } }, ico(ic, 20)), h('small', null, label), h('b', null, val));
+    };
+    var dayOf = function (t) { return t ? new Date(t).toLocaleDateString('en-CA') : '—'; };
+    var head = null, body;
     if (cur) {
+      var delAll = cur.orders.filter(function (o) { return DEL_OK.indexOf(o.status) >= 0; });
+      var sorted = cur.orders.slice().sort(function (x, y) { return (Date.parse(y.created_at) || 0) - (Date.parse(x.created_at) || 0); });
       body = h(Fr(), null,
-        h('button', { className: 'btn sm ghost', style: { marginBottom: 10 }, onClick: function () { sel[1](null); } }, '‹ كل الزبائن'),
-        h('div', { className: 'card' },
-          h('div', { className: 'bold', style: { fontSize: 17 } }, cur.name || 'بدون اسم'),
-          h('a', { href: 'tel:' + cur.phone, className: 'muted', dir: 'ltr', style: { display: 'block', textAlign: 'start' } }, cur.phone),
-          h('div', { className: 'row', style: { gap: 6, flexWrap: 'wrap', marginTop: 8 } },
-            h('span', { className: 'tag' }, cur.orders.length + ' طلب'), h('span', { className: 'tag' }, 'الإجمالي ' + money(cur.total)), h('span', { className: 'tag gray' }, 'المُسلَّم ' + money(cur.paid))),
-          h('button', { className: 'btn danger block', style: { marginTop: 10 }, onClick: function () { askCustomer(cur); } }, 'حذف الزبون')),
-        h('div', { className: 'h2' }, 'طلبات الزبون'),
-        cur.orders.map(function (o) {
+        h('button', { className: 'wq-back', onClick: function () { sel[1](null); } }, ico(I.chev, 18, { style: { transform: 'scaleX(-1)' } }), ' كل الزبائن'),
+        h('div', { className: 'wq-det' }, avatar(40),
+          h('h3', null, cur.name || 'بدون اسم'),
+          h('a', { href: 'tel:' + cur.phone, className: 'tl' }, h('i', null, ico(I.phone, 13)), h('span', null, cur.phone))),
+        h('div', { className: 'wq-stats' },
+          stat(I.cal, '#fdeadf', ORANGE, 'آخر طلب', dayOf(cur.last)),
+          stat(I.box, '#dbeafe', '#2563eb', 'عدد الطلبات', cur.orders.length + ' طلب'),
+          stat(I.cash, '#dcf5e5', '#16a34a', 'إجمالي المشتريات', money(cur.total))),
+        h('div', { className: 'wq-acts' },
+          h('button', { className: 'wq-b-del', onClick: function () { askCustomer(cur); } }, ico(I.trash, 18), 'حذف الزبون'),
+          h('a', { className: 'wq-b-call', href: 'tel:' + cur.phone }, ico(I.phone, 18), 'اتصال')),
+        h('div', { className: 'wq-h' }, h('span', null, 'الطلبات (' + cur.orders.length + ')'),
+          delAll.length > 1 ? h('button', { onClick: function () { askMany(cur, delAll); } }, 'حذف كل المنتهية والملغية (' + delAll.length + ')') : null),
+        sorted.map(function (o) {
           var can = DEL_OK.indexOf(o.status) >= 0;
-          return h('div', { key: o.id, className: 'card' },
-            h('div', { className: 'row between' }, h('div', { className: 'bold' }, 'W' + o.order_no + ' · ' + shopName(o.shop_id)), h('span', { className: 'tag ' + tagCls(o.status) }, LBL[o.status] || o.status)),
-            h('div', { className: 'row between small', style: { marginTop: 4 } }, h('span', { className: 'muted' }, when(Date.parse(o.created_at))), h('b', null, money(o.total))),
-            can ? h('button', { className: 'btn sm danger', style: { marginTop: 8 }, onClick: function () { askOrder(o, cur); } }, 'حذف الطلب')
-              : h('div', { className: 'muted small', style: { marginTop: 6 } }, 'لا يمكن حذف طلب جارٍ. يُحذف المُسلَّم أو الملغي أو المتعذَّر فقط.'));
+          return h('div', { key: o.id, className: 'wq-or' },
+            h('div', { className: 't' }, h('div', { className: 'no' }, '#W' + o.order_no + ' · ' + shopName(o.shop_id)), pill(o.status)),
+            h('div', { className: 'd' }, when(Date.parse(o.created_at))),
+            h('div', { className: 'b' }, h('b', null, money(o.total)),
+              can ? h('button', { className: 'wq-trash', onClick: function () { askOrder(o, cur); } }, ico(I.trash, 15), 'حذف')
+                : h('span', { className: 'wq-lock' }, 'جارٍ — لا يُحذف قبل انتهائه')));
         }));
     } else {
+      var totOrders = list.reduce(function (t, g) { return t + g.orders.length; }, 0), totSum = list.reduce(function (t, g) { return t + g.total; }, 0);
       body = h(Fr(), null,
-        h('input', { className: 'search', placeholder: 'ابحث بالاسم أو رقم الهاتف', value: q[0], onChange: function (e) { q[1](e.target.value); more[1](50); } }),
+        h('div', { className: 'wq-search' }, ico(I.search, 20),
+          h('input', { className: 'search', placeholder: 'ابحث بالاسم أو رقم الهاتف', value: q[0], onChange: function (e) { q[1](e.target.value); more[1](50); } })),
+        h('div', { className: 'wq-stats' },
+          stat(I.users, '#fdeadf', ORANGE, 'عدد الزبائن', list.length + ' زبون'),
+          stat(I.bag, '#dbeafe', '#2563eb', 'إجمالي الطلبات', totOrders + ' طلب'),
+          stat(I.cart, '#dcf5e5', '#16a34a', 'إجمالي المشتريات', money(totSum))),
+        h('div', { className: 'row between', style: { margin: '0 2px 8px' } }, h('span', { className: 'small muted' }, CU.rows ? shown.length + ' زبون' : ''),
+          h('button', { className: 'btn sm ghost', disabled: CU.loading, onClick: function () { reload(true); } }, CU.loading ? 'جارٍ التحديث…' : 'تحديث')),
         CU.err ? h('div', { className: 'wc-msg' }, CU.err) : null,
         !CU.rows && CU.loading ? h('div', { className: 'muted', style: { textAlign: 'center', padding: 20 } }, 'جارٍ التحميل…') : null,
         CU.rows && CU.truncated ? h('div', { className: 'wc-msg' }, 'تم تحميل أحدث 10,000 طلب فقط؛ قد لا تظهر طلبات أقدم.') : null,
         CU.rows && !shown.length ? h('div', { className: 'empty' }, term ? 'لا يوجد زبون مطابق للبحث.' : 'لا يوجد زبائن بعد.') : null,
         shown.slice(0, more[0]).map(function (g) {
-          return h('button', { key: g.key, className: 'card wc-cust', onClick: function () { sel[1](g.key); } },
-            h('div', { className: 'row between' }, h('div', { className: 'bold' }, g.name || 'بدون اسم'), h('span', { className: 'muted small', dir: 'ltr' }, g.phone)),
-            h('div', { className: 'row', style: { gap: 6, flexWrap: 'wrap', marginTop: 6 } },
-              h('span', { className: 'tag' }, g.orders.length + ' طلب'), h('span', { className: 'tag amber' }, 'الإجمالي ' + money(g.total))));
+          return h('div', { key: g.key, className: 'wq-row wc-cust', role: 'button', tabIndex: 0, onClick: function () { sel[1](g.key); } },
+            h('a', { className: 'wq-call', href: 'tel:' + g.phone, 'aria-label': 'اتصال', onClick: function (e) { e.stopPropagation(); } }, ico(I.phone, 18)),
+            h('div', { className: 'wq-end' }, h('span', { className: 'wq-bd' }, 'طلبات ' + g.orders.length), h('div', { className: 'wq-am' }, money(g.total))),
+            h('div', { className: 'wq-mid' }, h('div', { className: 'wq-nm' }, g.name || 'بدون اسم'), h('div', { className: 'wq-ph' }, g.phone)),
+            avatar(24));
         }),
         shown.length > more[0] ? h('button', { className: 'btn block ghost', onClick: function () { more[1](more[0] + 50); } }, 'عرض المزيد (' + (shown.length - more[0]) + ')') : null);
     }
