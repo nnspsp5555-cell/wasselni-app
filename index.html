@@ -141,6 +141,7 @@
     WS_CANNOT_UNASSIGN: 'لا يمكن إلغاء الإسناد بعد استلام الطلب',
     WS_OFFER_EXPIRED: 'انتهت مهلة الطلب أو أُسند لغيرك',
     WS_CLOSED: 'استقبال الطلبات متوقف حالياً',
+    WS_DUPLICATE: 'وصلنا طلبك قبل لحظات. راجع صفحة «طلباتي» ولا تكرر الإرسال',
     WS_STATUS_NOT_SAVED: 'لم تُحفظ الحالة في قاعدة البيانات، أعد المحاولة',
     WS_LOC_NOT_SAVED: 'لم يُحفظ الموقع: أعمدة الموقع غير موجودة في قاعدة البيانات. شغّل shop_location_migration.sql في SQL Editor ثم أعد المحاولة'
   };
@@ -286,12 +287,18 @@
     if (!ids.length) return Promise.resolve();
     return rpc('get_my_orders', { p_ids: ids }).then(function (rows) {
       if (guardWrite()) return;
-      setState(function (s) { return Object.assign({}, s, { orders: rows.map(orderOf) }); });
+      var next = rows.map(orderOf), prev = {};
+      ((S.latest && S.latest.orders) || []).forEach(function (x) { prev[x.uid] = x.status; });
+      var TXT = { accepted: 'تم قبول طلبك', preparing: 'طلبك قيد التجهيز', picked_up: 'المندوب استلم طلبك', on_the_way: 'طلبك بالطريق إليك الآن', delivered: 'تم تسليم طلبك. بالهناء والشفاء', cancelled: 'تم إلغاء طلبك' };
+      var ch = next.filter(function (x) { return prev[x.uid] && prev[x.uid] !== x.status && TXT[x.status]; });
+      ch.forEach(function (x) { S.notify(x.id + ': ' + TXT[x.status]); });
+      if (ch.length) { try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} beep(); }
+      setState(function (s) { return Object.assign({}, s, { orders: next }); });
     });
   }
 
   function cycle() {
-    if (S.running || document.hidden) return Promise.resolve();
+    if (S.running || document.hidden || navigator.onLine === false) return Promise.resolve();
     S.running = true;
     S.tick++;
     if (MODE === 'admin') locFlush();
@@ -320,7 +327,7 @@
   function start(set, notify) {
     if (!ON) return noop;
     S.set = set; S.notify = notify || noop;
-    var every = MODE === 'admin' ? 5000 : MODE === 'courier' ? 8000 : (Number(C.CUSTOMER_POLL_MS) || 15000);
+    var every = MODE === 'admin' ? 8000 : MODE === 'courier' ? 8000 : (Number(C.CUSTOMER_POLL_MS) || 15000);
     var timer = setInterval(cycle, every);
     var ot = MODE === 'courier' ? setInterval(function () { if (!document.hidden && session) pullOffers(); }, 3000) : null;
     var onVis = function () { if (!document.hidden) { S.force = true; cycle(); pullOffers(); } };
@@ -399,6 +406,12 @@
     if (SH.loaded && !SH.open) { shClosedEvt(); return Promise.resolve(null); }
     placing = true;
     var items = l.cart.map(function (x) { return { product_id: x.productId, qty: x.qty }; });
+    var sig = String(E.phone) + '|' + items.map(function (x) { return x.product_id + 'x' + x.qty; }).sort().join(',');
+    try {
+      var lp = JSON.parse(localStorage.getItem('wasselni_lastplace') || 'null');
+      if (lp && lp.s === sig && Date.now() - lp.t < 25000) { placing = false; S.notify('أُرسل هذا الطلب قبل لحظات. راجع صفحة «طلباتي»'); return Promise.resolve(null); }
+      localStorage.setItem('wasselni_lastplace', JSON.stringify({ s: sig, t: Date.now() }));
+    } catch (e) {}
     return rpc('place_order', {
       p_name: E.name, p_phone: E.phone, p_address: E.address,
       p_lat: E.lat == null ? null : E.lat, p_lng: E.lng == null ? null : E.lng, p_items: items
@@ -412,6 +425,7 @@
           profile: { name: E.name, phone: E.phone, address: E.address }
         });
       });
+      try { localStorage.setItem('wasselni_lastplace', JSON.stringify({ s: sig, t: Date.now() })); } catch (e) {}
       S.notify('تم إرسال طلبك ' + o.id + ' بنجاح');
       pullCatalog(true).catch(noop);
       return o;
@@ -988,6 +1002,7 @@
     banner: { add: bannerAdd, update: bannerUpdate, remove: bannerRemove }, shop: { add: shopAdd, remove: shopRemove, saveLoc: shopLocSave, locPending: locPending, locFlush: locFlush },
     cust: { fetchAll: custFetchAll, deleteOrders: custDeleteOrders, errMsg: msg },
     hours: { get: shGet, sub: shSub, pull: shPull, set: shSet, err: msg },
+    report: function (from, to) { return rpc('admin_report', { p_from: from, p_to: to }); },
     removeOrders: removeOrders, toggleFav: toggleFav, setAcct: setAcct,
     img: img, h: h, LoginView: LoginView, Account: Account, normPhone: normPhone, beep: beep,
     courier: { add: courierAdd, update: courierUpdate, password: courierPassword, setAuto: setAutoAssign,
@@ -1944,6 +1959,19 @@
     '.wh-md .hd .m{width:70px;height:70px;border-radius:50%;background:#ffffff2e;margin:0 auto 10px;display:flex;align-items:center;justify-content:center}',
     '.wh-md h3{margin:0;font-size:21px}.wh-md p{margin:0 0 12px;line-height:1.8;font-size:15px;color:#3a3f3d;white-space:pre-wrap}',
     '.wh-back{display:inline-flex;gap:6px;align-items:center;background:#fff1e6;color:#c4510f;border-radius:99px;padding:8px 14px;font-weight:800;font-size:13.5px;margin-bottom:12px}',
+    '.wr-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:12px;margin-bottom:12px;box-shadow:0 1px 6px #0000000d}',
+    '.wr-top{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:0;background:none;font:inherit;color:inherit;padding:2px;cursor:pointer}',
+    '.wr-top b{display:flex;align-items:center;gap:8px;font-size:16px}',
+    '.wr-top i{width:34px;height:34px;border-radius:12px;background:var(--brand-soft,#fdeee4);color:var(--brand);display:flex;align-items:center;justify-content:center}',
+    '.wr-seg{display:flex;gap:6px;margin:12px 0}',
+    '.wr-seg button{flex:1;border:0;border-radius:12px;padding:9px 4px;font:inherit;font-weight:700;font-size:13px;background:#eef1ef;color:#5b6761;cursor:pointer}',
+    '.wr-seg button.on{background:var(--brand);color:#fff}',
+    '.wr-g{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}',
+    '.wr-c{border-radius:14px;padding:10px 12px;background:#f6f8f7}',
+    '.wr-c small{display:block;color:var(--muted);font-size:12px}.wr-c b{display:block;font-size:19px;margin-top:2px;font-variant-numeric:tabular-nums}',
+    '.wr-c.ok{background:#e8f7ee}.wr-c.ok b{color:#15803d}.wr-c.bad{background:#fdecec}.wr-c.bad b{color:#b91c1c}.wr-c.sl{background:#fff1e6}.wr-c.sl b{color:var(--brand)}',
+    '.wr-bars{display:flex;align-items:flex-end;gap:3px;height:70px;margin-top:12px;direction:ltr}',
+    '.wr-bars div{flex:1;background:var(--brand);border-radius:4px 4px 0 0;min-height:2px;opacity:.85}',
     '.wq-ic{width:64px;height:64px;border-radius:18px;background:#fdeadf;color:#dc2626;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}'
   ].join('');
   document.head.appendChild(st);
@@ -2723,6 +2751,42 @@
           h('button', { className: 'btn ghost', disabled: busy[0], onClick: p.onClose }, 'إلغاء'),
           h('button', { className: 'btn' + (closing ? ' danger' : ''), disabled: busy[0], onClick: go }, busy[0] ? 'جارٍ الحفظ والتحقق…' : (closing ? 'إغلاق الآن' : 'فتح الآن')))));
   }
+
+  /* ------------------------- المدير: التقارير (استعلام واحد مجمَّع عند الطلب فقط) ------------------------- */
+  function ReportsCard() {
+    var X = R(), open = X.useState(false), per = X.useState('7'), data = X.useState(null), busy = X.useState(false), err = X.useState('');
+    function range(p) {
+      var to = new Date(Date.now() + 86400000), from = new Date();
+      from.setHours(0, 0, 0, 0);
+      if (p === '7') from.setDate(from.getDate() - 6); else if (p === '30') from.setDate(from.getDate() - 29); else if (p === 'all') from = new Date('2020-01-01');
+      return [from.toISOString(), to.toISOString()];
+    }
+    function load(p) {
+      busy[1](true); err[1]('');
+      var r = range(p);
+      WS.report(r[0], r[1]).then(function (j) { data[1](j); busy[1](false); }).catch(function (e) { busy[1](false); err[1](/admin_report/.test(String(e && e.message)) || (e && e.code === 'PGRST202') ? 'شغّل ملف launch_hardening.sql في Supabase أولاً' : WS.cust.errMsg(e)); });
+    }
+    X.useEffect(function () { if (open[0]) load(per[0]); }, [open[0], per[0]]);
+    var d = data[0], days = (d && d.by_day) || [], mx = Math.max.apply(null, [1].concat(days.map(function (x) { return x.orders; })));
+    var P = [['0', 'اليوم'], ['7', '7 أيام'], ['30', '30 يوماً'], ['all', 'الكل']];
+    return h('div', { className: 'wr-card' },
+      h('button', { className: 'wr-top', onClick: function () { open[1](!open[0]); } }, h('b', null, h('i', null, ico(I.bag, 18)), 'التقارير والإحصائيات'), h('span', { className: 'muted small' }, open[0] ? 'إخفاء' : 'عرض')),
+      open[0] ? h(Fr(), null,
+        h('div', { className: 'wr-seg' }, P.map(function (x) { return h('button', { key: x[0], className: per[0] === x[0] ? 'on' : '', onClick: function () { per[1](x[0]); } }, x[1]); })),
+        err[0] ? h('div', { className: 'wc-msg' }, err[0]) : null,
+        !d && busy[0] ? h('div', { className: 'muted small', style: { textAlign: 'center', padding: 10 } }, 'جارٍ التحميل…') : null,
+        d ? h(Fr(), null,
+          h('div', { className: 'wr-g' },
+            h('div', { className: 'wr-c' }, h('small', null, 'عدد الطلبات'), h('b', null, d.total)),
+            h('div', { className: 'wr-c sl' }, h('small', null, 'المبيعات (المسلَّمة)'), h('b', null, money(d.sales))),
+            h('div', { className: 'wr-c ok' }, h('small', null, 'مكتملة'), h('b', null, d.delivered)),
+            h('div', { className: 'wr-c bad' }, h('small', null, 'ملغاة / متعذّرة'), h('b', null, (d.cancelled || 0) + (d.failed || 0))),
+            h('div', { className: 'wr-c' }, h('small', null, 'قيد التنفيذ'), h('b', null, d.active)),
+            h('div', { className: 'wr-c' }, h('small', null, 'متوسط الطلب'), h('b', null, money(d.avg)))),
+          days.length > 1 ? h('div', { className: 'wr-bars', title: 'الطلبات يومياً' }, days.slice(-30).map(function (x) { return h('div', { key: x.d, title: x.d + ': ' + x.orders, style: { height: Math.max(3, Math.round(x.orders / mx * 100)) + '%' } }); })) : null,
+          h('button', { className: 'btn sm ghost', style: { marginTop: 10 }, disabled: busy[0], onClick: function () { load(per[0]); } }, busy[0] ? 'جارٍ التحديث…' : 'تحديث')) : null) : null);
+  }
+
   function ShopToggle() {
     var X = R(), hr = useHours(), dlg = X.useState(false);
     X.useEffect(function () { WS.hours.pull(); }, []);
@@ -2743,7 +2807,7 @@
       h('button', { className: 'wh-chip' + (hr.open ? '' : ' off'), onClick: function () { dlg[1](true); } }, h('i'), hr.open ? 'مفتوح' : 'مغلق'),
       dlg[0] ? h(HoursDialog, { hours: hr, onClose: function () { dlg[1](false); } }) : null);
   }
-  function WithShopToggle(p) { return h(Fr(), null, h(ShopToggle), p.children); }
+  function WithShopToggle(p) { return h(Fr(), null, h(ShopToggle), h(ReportsCard), p.children); }
 
   function ClosedBanner() {
     var X = R(), hr = useHours(), md = X.useState(false);
