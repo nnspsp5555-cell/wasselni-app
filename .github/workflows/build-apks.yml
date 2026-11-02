@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['index.html', '.github/workflows/build-apks.yml']
+    paths: ['index.html', 'index.ts', '.github/workflows/build-apks.yml']
 permissions:
   contents: write
 jobs:
@@ -17,12 +17,12 @@ jobs:
             cap: Admin
             ar: وصّلني المدير
             title: Wasselni Admin
-            deps: '{"name":"wasselni-admin","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^8.0.0","@capacitor/core":"^8.0.0"},"devDependencies":{"@capacitor/cli":"^8.0.0"}}'
+            deps: '{"name":"wasselni-admin","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^8.0.0","@capacitor/core":"^8.0.0","@capacitor/push-notifications":"^8.0.0"},"devDependencies":{"@capacitor/cli":"^8.0.0"}}'
           - kind: courier
             cap: Courier
             ar: مندوب وصّلني
             title: Wasselni Courier
-            deps: '{"name":"wasselni-courier","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^8.0.0","@capacitor/cli":"^8.0.0","@capacitor/core":"^8.0.0"}}'
+            deps: '{"name":"wasselni-courier","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^8.0.0","@capacitor/cli":"^8.0.0","@capacitor/core":"^8.0.0","@capacitor/push-notifications":"^8.0.0"}}'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,7 +55,35 @@ jobs:
           grep -q ACCESS_FINE_LOCATION "$M" || sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <application|' "$M"
           grep -q ACCESS_FINE_LOCATION "$M"
           sed -i -E "s/versionCode( *=)? *[0-9]+/versionCode\1 ${{ github.run_number }}/" android/app/build.gradle
-          npx cap sync android
+      - name: Push notifications setup
+        working-directory: ${{ matrix.kind }}-app
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          A=android/app/src/main
+          if [ -n "$GS_B64" ]; then echo "$GS_B64" | base64 -d > android/app/google-services.json; else echo "WARNING: no google-services.json, push disabled in this build"; fi
+          mkdir -p $A/res/raw $A/res/drawable-xxhdpi $A/res/values
+          echo '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' | base64 -d > $A/res/drawable-xxhdpi/ic_stat_wasselni.png
+          printf '<?xml version="1.0" encoding="utf-8"?><resources><color name="wasselni_orange">#F26A1B</color></resources>' > $A/res/values/colors_push.xml
+          python3 - <<'PY'
+          import wave, struct, math
+          sr=22050; frames=[]
+          for f,d in ((880,0.18),(1175,0.18),(1568,0.34)):
+              n=int(sr*d)
+              for i in range(n):
+                  env=min(1,i/300)*min(1,(n-i)/1200)
+                  frames.append(int(14000*env*math.sin(2*math.pi*f*i/sr)))
+              frames += [0]*int(sr*0.04)
+          w=wave.open("android/app/src/main/res/raw/wasselni.wav","wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
+          w.writeframes(b"".join(struct.pack("<h",x) for x in frames)); w.close()
+          PY
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q POST_NOTIFICATIONS "$M" || sed -i 's|<application|<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application|' "$M"
+          sed -i 's|</application>|<meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_wasselni" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/wasselni_orange" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="orders" />\n    </application>|' "$M"
+          grep -q default_notification_icon "$M"
+      - name: Sync Capacitor
+        working-directory: ${{ matrix.kind }}-app
+        run: npx cap sync android
       - name: Build APK
         working-directory: ${{ matrix.kind }}-app/android
         env:
@@ -76,3 +104,26 @@ jobs:
           cp ${{ matrix.kind }}-app/android/app/build/outputs/apk/debug/app-debug.apk wasselni-${{ matrix.kind }}.apk
           gh release delete ${{ matrix.kind }}-latest --yes --cleanup-tag || true
           gh release create ${{ matrix.kind }}-latest wasselni-${{ matrix.kind }}.apk --title "${{ matrix.title }}" --notes "Download wasselni-${{ matrix.kind }}.apk and install it on the ${{ matrix.kind }} phone."
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Set secrets (server side only)
+        run: |
+          supabase secrets set --project-ref gvsuenendqtbutesncll \
+            FCM_SERVICE_ACCOUNT="$(echo '${{ secrets.FCM_SERVICE_ACCOUNT_B64 }}' | base64 -d)" \
+            PUSH_WEBHOOK_SECRET='${{ secrets.PUSH_WEBHOOK_SECRET }}'
+      - name: Place function file
+        run: |
+          if [ -f index.ts ]; then
+            mkdir -p supabase/functions/send-push
+            cp index.ts supabase/functions/send-push/index.ts
+          fi
+          ls -l supabase/functions/send-push/
+      - name: Deploy function
+        run: supabase functions deploy send-push --no-verify-jwt --project-ref gvsuenendqtbutesncll
