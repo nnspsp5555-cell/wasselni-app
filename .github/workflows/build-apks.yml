@@ -115,7 +115,7 @@ jobs:
           version: latest
       - name: Set secrets (server side only)
         run: |
-          supabase secrets set --project-ref gvsuenendqtbutesncll \
+          supabase secrets set --yes --project-ref gvsuenendqtbutesncll \
             FCM_SERVICE_ACCOUNT="$(echo '${{ secrets.FCM_SERVICE_ACCOUNT_B64 }}' | base64 -d)" \
             PUSH_WEBHOOK_SECRET='${{ secrets.PUSH_WEBHOOK_SECRET }}'
       - name: Place function file
@@ -126,4 +126,4 @@ jobs:
           fi
           ls -l supabase/functions/send-push/
       - name: Deploy function
-        run: supabase functions deploy send-push --no-verify-jwt --project-ref gvsuenendqtbutesncll
+        run: supabase functions deploy send-push --no-verify-jwt --project-ref gvsuenendqtbutesncll --yes
