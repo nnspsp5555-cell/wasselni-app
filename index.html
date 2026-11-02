@@ -1216,8 +1216,9 @@
     '.wl-row{display:flex;align-items:center;gap:10px}',
     '.wl-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}',
     '.wl-acts .btn.sm{padding:7px 12px;font-size:13px}',
-    '.wl-ics{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}',
-    '.wl-ics button{border:2px solid transparent;background:#f4f6f5;border-radius:12px;padding:4px;display:flex;align-items:center;justify-content:center}',
+    '.wl-ics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}',
+    '.wl-ics button{border:3px solid transparent;background:#f4f6f5;border-radius:20px;padding:0;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden}',
+    '.wl-ics button svg{width:100%;height:100%;display:block}',
     '.wl-ics button.on{border-color:var(--brand);background:var(--brand-soft)}',
     '.wl-sw{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}',
     '.wl-sw button{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #0003}',
@@ -1335,8 +1336,8 @@
   }
 
   function CatTile(p) {
-    var c = p.cat, noimg = !c.image;
-    var st = noimg ? { backgroundImage: 'linear-gradient(145deg,' + (c.tintBg || '#fff0e6') + ',#ffffff 140%)' } : { backgroundImage: 'url("' + c.image + '")' };
+    var c = p.cat, pic = c.image || MIMG[c.icon], noimg = !pic;
+    var st = noimg ? { backgroundImage: 'linear-gradient(145deg,' + (c.tintBg || '#fff0e6') + ',#ffffff 140%)' } : { backgroundImage: 'url("' + pic + '")' };
     var kids = [noimg ? h('span', { key: 'i', className: 'ill' }, h(Illus, { icon: c.icon, tint: c.tint, size: Math.round((p.size || 104) * .56) })) : null,
       c.enabled === false ? h('span', { key: 's', className: 'soon' }, 'جاري العمل') : null,
       h('b', { key: 'n' }, p.label)];
@@ -1479,7 +1480,7 @@
       h(Field, { label: 'الاسم المختصر (يظهر فوق الصورة في الصفحة الرئيسية)', value: short[0], onChange: short[1] }),
       h('div', { className: 'small muted', style: { marginBottom: 6 } }, 'الأيقونة'),
       h('div', { className: 'wl-ics' }, ICONS.map(function (k) {
-        return h('button', { key: k, type: 'button', className: icon[0] === k ? 'on' : '', onClick: function () { icon[1](k); } }, h(Illus, { icon: k, tint: PAL[ci[0]], size: 30 }));
+        return h('button', { key: k, type: 'button', className: icon[0] === k ? 'on' : '', onClick: function () { icon[1](k); } }, h(Illus, { icon: k, tint: PAL[ci[0]], size: 110 }));
       })),
       h('div', { className: 'small muted', style: { marginBottom: 6 } }, 'اللون'),
       h('div', { className: 'wl-sw' }, PAL.map(function (c, i) { return h('button', { key: c, type: 'button', className: ci[0] === i ? 'on' : '', style: { background: c }, onClick: function () { ci[1](i); } }); })),
