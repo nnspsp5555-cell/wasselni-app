@@ -271,7 +271,7 @@
   function zoneNote(z) {
     var i = zoneInfo(z), f = window.WS.h;
     if (!i.on) return null;
-    if (!i.loc) return f('div', { className: 'card tag', style: { display: 'block' } }, 'حدد موقعك لمعرفة منطقة التوصيل وسعرها');
+    if (!i.loc) return f('div', { className: 'card tag', style: { display: 'block' } }, 'سعر التوصيل الظاهر مبدئي. حدد موقعك على الخريطة ليظهر سعر منطقتك النهائي');
     if (!i.zone) return f('div', { className: 'card tag red', style: { display: 'block' } }, 'موقعك خارج مناطق التوصيل. لا يمكن إرسال الطلب.');
     return f('div', { className: 'card tag', style: { display: 'block' } }, 'منطقة التوصيل: ' + i.zone.name + ' · ' + i.zone.fee.toLocaleString('en') + ' د.ع');
   }
