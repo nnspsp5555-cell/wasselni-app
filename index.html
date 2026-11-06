@@ -153,6 +153,7 @@
   };
   function msg(e) {
     var m = String((e && e.message) || '');
+    if (/admin_save_section/.test(m) && /not find|does not exist|schema cache/i.test(m)) return 'شغّل ملف shop_sections_link.sql في Supabase أولاً';
     if (/extra_category_ids/.test(m)) return 'شغّل ملف shop_multi_categories.sql في Supabase أولاً';
     if (/admin_(save|delete)_zone/.test(m) && /not find|does not exist|schema cache/i.test(m)) return 'شغّل ملف delivery_zones.sql في Supabase أولاً';
     if (/admin_(get|set)_shop_(hours|override)/.test(m) && /not find|does not exist|schema cache/i.test(m)) return 'شغّل ملف shop_hours.sql في Supabase أولاً';
@@ -1160,7 +1161,7 @@
     hours: { get: shGet, sub: shSub, pull: shPull, set: shSet, err: msg },
     zoneTotals: zoneTotals, zoneNote: zoneNote,
     sections: {
-      save: function (id, shop, name) { return rpc('admin_save_section', { p_id: id || null, p_shop: String(shop), p_name: name }).then(function (r) { return pullCatalog(true).catch(noop).then(function () { return r; }); }); },
+      save: function (id, shop, name, cat, setCat) { return rpc('admin_save_section', Object.assign({ p_id: id || null, p_shop: String(shop), p_name: name }, setCat ? { p_category: cat || '', p_set_category: true } : {})).then(function (r) { return pullCatalog(true).catch(noop).then(function () { return r; }); }); },
       remove: function (id) { return rpc('admin_delete_section', { p_id: id }).then(function (r) { return pullCatalog(true).catch(noop).then(function () { return r; }); }); },
       reorder: function (shop, ids) { return rpc('admin_reorder_sections', { p_shop: String(shop), p_ids: ids }).then(function (r) { return pullCatalog(true).catch(noop).then(function () { return r; }); }); }
     },
@@ -1170,8 +1171,9 @@
     },
     prodInCat: function (p, id, shops) {
       if (p.categoryId === id) return true;
-      var sh = (shops || (S.latest && S.latest.shops) || []).filter(function (x) { return x.id === p.shopId; })[0];
-      return !!(sh && sh.extraCats && sh.extraCats.indexOf(String(id)) >= 0);
+      if (!p.sectionId) return false;
+      var sec = ((S.latest && S.latest.sections) || []).filter(function (x) { return x.id === p.sectionId; })[0];
+      return !!(sec && sec.category_id && String(sec.category_id) === String(id));
     },
     shopTxt: shopTxt, whenTxt: whenTxt, notify: function (m) { S.notify(m); },
     shopHours: {
@@ -1367,6 +1369,7 @@
     '.wl-dsc{position:absolute;top:8px;inset-inline-start:8px;background:#e03131;color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;z-index:2}.wl-old{color:#999;font-size:.8em;font-weight:400}.wl-dsc2{background:#e03131;color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;margin-inline-start:4px}.wl-dpick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.wl-dpick button{border:1px solid #d5d8de;background:#fff;border-radius:10px;padding:6px 12px;font-weight:700}.wl-dpick button.on{background:#e8590c;color:#fff;border-color:#e8590c}',
     '.wl-supbtn{display:flex;align-items:center;gap:10px;width:100%;border:0;background:#fff0e6;color:#c4510f;border-radius:16px;padding:14px;font-size:16px;position:relative}.wl-bdg,.wl-bdg2{background:#e03131;color:#fff;font-style:normal;font-weight:800;font-size:11px;min-width:18px;height:18px;line-height:18px;text-align:center;border-radius:9px;padding:0 4px}.wl-bdg{position:absolute;top:2px;inset-inline-end:6px}.wl-supbtn .wl-bdg2{margin-inline-start:auto}.tabbar .tab{position:relative}.wl-sov{position:fixed;inset:0;z-index:99999;background:#f4f6f5;display:flex;flex-direction:column}.wl-shead{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#f26a1b,#ff9a4d);color:#fff;padding:14px 16px}.wl-shead button{background:#ffffff33;border:0;color:#fff;width:36px;height:36px;border-radius:12px;font-size:24px;line-height:1}.wl-chat{display:flex;flex-direction:column;flex:1;min-height:0}.wl-sbox{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}.wl-sdate{align-self:center;background:#e3e8e6;color:#555;font-size:12px;border-radius:10px;padding:2px 10px;margin:6px 0}.wl-sb{max-width:82%;border-radius:16px;padding:8px 12px;position:relative}.wl-sb.mine{align-self:flex-start;background:#f26a1b;color:#fff;border-end-start-radius:4px}.wl-sb.their{align-self:flex-end;background:#fff;color:#17211d;box-shadow:0 1px 4px #0000001a;border-end-end-radius:4px}.wl-stx{white-space:pre-wrap;word-break:break-word;line-height:1.6}.wl-stm{font-size:10px;opacity:.7;margin-top:2px}.wl-sord{font-size:12px;font-weight:700;margin-bottom:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.wl-sord button{border:0;background:#14233c;color:#fff;border-radius:8px;padding:2px 8px;font-size:11px}.wl-scomp{display:flex;gap:8px;padding:10px;background:#fff;border-top:1px solid #e3e8e6;align-items:flex-end}.wl-scomp textarea{flex:1;border:1px solid #d5d8de;border-radius:14px;padding:10px;font:inherit;resize:none;max-height:120px;min-height:44px}.wl-sel{margin:0 10px 6px;border:1px solid #d5d8de;border-radius:12px;padding:8px;background:#fff;font:inherit}.wl-sid{display:flex;flex-direction:column;gap:6px;padding:8px 10px;background:#fff}.wl-sid input{border:1px solid #d5d8de;border-radius:12px;padding:10px;font:inherit}.wl-sadm{display:flex;flex-direction:column;height:calc(100vh - 190px);min-height:380px}.wl-shead2{display:flex;align-items:center;gap:8px;margin-bottom:8px}.wl-sadm .wl-chat{background:#eef1f0;border-radius:16px;overflow:hidden}.wl-kind{font-size:10px;font-weight:800;border-radius:8px;padding:1px 7px;margin-inline-start:6px;background:#e7f5ff;color:#1c7ed6}.wl-kind.courier{background:#fff3bf;color:#a66a00}.wl-srow{display:block;width:100%;text-align:start;border:0}.wl-srow.un{border-inline-start:4px solid #e03131}',
     '.wl-mchips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none}.wl-mchips::-webkit-scrollbar{display:none}.wl-mchips button{flex:none;border:0;background:#fff;color:#c4510f;font-weight:700;border-radius:20px;padding:8px 16px;box-shadow:0 1px 4px #0000001a}.wl-mchips button.on{background:#e8590c;color:#fff}.wl-msec{scroll-margin-top:12px}',
+    '.wl-share{text-align:center}.wl-qr{display:block;width:210px;height:210px;margin:10px auto;border-radius:16px;box-shadow:0 2px 12px #14233c22}.wl-lnk{direction:ltr;word-break:break-all;background:#f4f6f5;border-radius:10px;padding:8px 10px;font-size:13px;margin:6px 0 10px;color:#14233c}',
     '.wl-shops{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:10px;scrollbar-width:none}',
     '.wl-shops::-webkit-scrollbar{display:none}',
     '.wl-shop{flex:0 0 138px;background:#fff;border:0;border-radius:18px;box-shadow:0 1px 6px #00000014;padding:0;overflow:hidden;text-align:start}',
@@ -1870,17 +1873,9 @@
       h('button', { className: 'btn sm ghost', onClick: function () { op[1](!op[0]); } }, op[0] ? 'إخفاء أقسام المتجر' : '📂 أقسام المتجر' + (list.length ? ' (' + list.length + ')' : '')),
       op[0] ? h('div', { className: 'wl-hbox' },
         st.sectionsReady === false ? h('div', { className: 'wl-warn' }, 'شغّل ملف shop_sections.sql في Supabase SQL Editor أولاً.') : null,
-        h('div', { className: 'small bold' }, 'يظهر المتجر في هذه الأقسام الرئيسية'),
-        h('div', { className: 'wl-dpick' }, nowCats().map(function (c) {
-          var prim = c.id === s.categoryId, on = prim || (s.extraCats || []).indexOf(String(c.id)) >= 0;
-          return h('button', { key: c.id, type: 'button', className: on ? 'on' : '', disabled: prim || bz[0], onClick: function () {
-            var cur = (s.extraCats || []).slice(), i = cur.indexOf(String(c.id)); if (i >= 0) cur.splice(i, 1); else cur.push(String(c.id));
-            WS.updateShop(s.id, { extraCats: cur });
-          } }, (on ? '✓ ' : '') + (c.short || c.name) + (prim ? ' (الأساسي)' : ''));
-        })),
-        h('div', { className: 'small bold' }, 'أقسام داخلية جاهزة (اضغط لإضافتها لهذا المتجر)'),
-        h('div', { className: 'wl-dpick' }, nowCats().filter(function (c) { return !list.some(function (x) { return x.name === (c.name || '').trim(); }); }).map(function (c) {
-          return h('button', { key: c.id, type: 'button', disabled: bz[0], onClick: function () { run(WS.sections.save(null, s.id, String(c.name).trim().slice(0, 40))); } }, '＋ ' + c.name);
+        h('div', { className: 'small bold' }, 'أضف قسماً داخلياً جاهزاً من أقسامك الرئيسية (يُربط بها تلقائياً)'),
+        h('div', { className: 'wl-dpick' }, nowCats().filter(function (c) { return !list.some(function (x) { return String(x.category_id) === String(c.id); }); }).map(function (c) {
+          return h('button', { key: c.id, type: 'button', disabled: bz[0], onClick: function () { run(WS.sections.save(null, s.id, String(c.name).trim().slice(0, 40), c.id, true)); } }, '＋ ' + c.name);
         })),
         h('div', { className: 'small bold' }, 'أقسام هذا المتجر (بالترتيب الذي يشوفه الزبون)'),
         list.map(function (x, i) {
@@ -1888,6 +1883,8 @@
           return h('div', { key: x.id, className: 'wl-hday' },
             h('input', { value: val, maxLength: 40, style: { flex: 1, minWidth: 90, border: '1px solid #d5d8de', borderRadius: 10, padding: 8 }, onChange: function (e) { var o = Object.assign({}, edit[0]); o[x.id] = e.target.value; edit[1](o); } }),
             h('span', { className: 'small muted' }, cnt(x.id) + ' منتج'),
+            h('select', { className: 'wl-sel', style: { margin: 0, maxWidth: 150 }, value: x.category_id || '', disabled: bz[0], title: 'يظهر منتجات هذا القسم داخل القسم الرئيسي', onChange: function (e) { run(WS.sections.save(x.id, s.id, x.name, e.target.value, true)); } },
+              h('option', { value: '' }, 'غير مرتبط بقسم رئيسي'), nowCats().map(function (c) { return h('option', { key: c.id, value: c.id }, 'يظهر في: ' + (c.short || c.name)); })),
             val.trim() !== x.name ? h('button', { className: 'btn sm', disabled: bz[0] || !val.trim(), onClick: function () { run(WS.sections.save(x.id, s.id, val.trim()).then(function () { var o = Object.assign({}, edit[0]); delete o[x.id]; edit[1](o); })); } }, 'حفظ') : null,
             h('button', { className: 'btn sm ghost', disabled: bz[0] || i === 0, onClick: function () { move(i, -1); }, 'aria-label': 'للأعلى' }, '↑'),
             h('button', { className: 'btn sm ghost', disabled: bz[0] || i === list.length - 1, onClick: function () { move(i, 1); }, 'aria-label': 'للأسفل' }, '↓'),
@@ -1896,7 +1893,7 @@
         h('div', { className: 'wl-hday' },
           h('input', { placeholder: 'اسم قسم جديد (مثل: برجر)', value: nm[0], maxLength: 40, style: { flex: 1, minWidth: 120, border: '1px solid #d5d8de', borderRadius: 10, padding: 8 }, onChange: function (e) { nm[1](e.target.value); } }),
           h('button', { className: 'btn sm', disabled: bz[0] || !nm[0].trim(), onClick: function () { run(WS.sections.save(null, s.id, nm[0].trim()).then(function () { nm[1](''); })); } }, '＋ إضافة')),
-        h('div', { className: 'small muted' }, 'بعد إضافة الأقسام اختر قسم كل منتج من تبويب «المنتجات».')) : null);
+        h('div', { className: 'small muted' }, 'اربط القسم الداخلي بقسم رئيسي ليظهر منتجاته فقط هناك (مثلاً قسم شاورما ← قسم الشاورما). بعدها اختر قسم كل منتج من تبويب «المنتجات».')) : null);
   }
   function ShopMenu(p) {
     var R_ = R(), st = B().ct(), act = R_.useState(''), list = shopSecs(st, p.shopId), prods = p.products;
@@ -2224,6 +2221,7 @@
         h('button', { className: 'wl2-pill', type: 'button', onClick: focusName }, Ico('pencil', 16), 'تعديل الملف الشخصي'),
         a.avatar ? h('button', { className: 'wl2-del', type: 'button', onClick: function () { WS.setAcct({ avatar: undefined }); } }, 'حذف الصورة') : null),
       h('div', { className: 'wl2-card' }, h(SupportCard, { kind: 'customer' })),
+      h(ShareCard),
       h('div', { className: 'wl2-card' },
         h('div', { className: 'wl2-h' }, Ico('user', 22), 'المعلومات الشخصية', saved[0] ? h('span', { className: 'wl2-sv' }, '✓ تم الحفظ') : null),
         h(IField, { id: 'wl-name', label: 'الاسم الكامل', icon: 'user', value: name[0], ph: 'اكتب اسمك', ac: 'name', onChange: function (v) { name[1](v); saved[1](false); }, onBlur: function () { commit(true); } }),
@@ -2364,6 +2362,140 @@
         load: function (after) { return WS.rpc('support_fetch', { p_kind: kind, p_token: tok, p_after: after || 0 }); },
         send: function (body, order) { var n = normIQ(ph[0]); return WS.rpc('support_send', { p_kind: kind, p_token: tok, p_name: nm[0].trim(), p_phone: n ? n.local : String(ph[0] || ''), p_body: body, p_order: order || null }); }
       }));
+  }
+  /* مولّد باركود QR صغير (وضع البايت، تصحيح M، إصدارات 1-10) */
+  function wsQR(text) {
+    var T = [null, [10, 1, 16, 0, 0], [16, 1, 28, 0, 0], [26, 1, 44, 0, 0], [18, 2, 32, 0, 0], [24, 2, 43, 0, 0], [16, 4, 27, 0, 0], [18, 4, 31, 0, 0], [22, 2, 38, 2, 39], [22, 3, 36, 2, 37], [26, 4, 43, 1, 44]];
+    var AL = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]];
+    var VI = [0, 0, 0, 0, 0, 0, 0, 0x07C94, 0x085BC, 0x09A99, 0x0A4D3];
+    var bytes = unescape(encodeURIComponent(text)).split('').map(function (c) { return c.charCodeAt(0); });
+    var v = 0, i, j, k;
+    for (i = 1; i <= 10; i++) { var t = T[i], cap = t[1] * t[2] + t[3] * t[4]; if (bytes.length <= cap - (i < 10 ? 2 : 3)) { v = i; break; } }
+    if (!v) return null;
+    var tv = T[v], dcw = tv[1] * tv[2] + tv[3] * tv[4], size = 17 + 4 * v;
+    var bits = [];
+    function put(val, n) { for (var b = n - 1; b >= 0; b--) bits.push((val >>> b) & 1); }
+    put(4, 4); put(bytes.length, v < 10 ? 8 : 16); bytes.forEach(function (b) { put(b, 8); });
+    put(0, Math.min(4, dcw * 8 - bits.length)); while (bits.length % 8) bits.push(0);
+    var data = []; for (i = 0; i < bits.length; i += 8) { var by = 0; for (j = 0; j < 8; j++) by = (by << 1) | bits[i + j]; data.push(by); }
+    for (var pad = 0xEC; data.length < dcw; pad ^= 0xEC ^ 0x11) data.push(pad);
+    var EXP = [], LOG = []; for (i = 0, k = 1; i < 255; i++) { EXP[i] = k; LOG[k] = i; k <<= 1; if (k & 256) k ^= 0x11D; }
+    function mul(a, b) { return a && b ? EXP[(LOG[a] + LOG[b]) % 255] : 0; }
+    var ecn = tv[0], gen = [1];
+    for (i = 0; i < ecn; i++) { var ng = []; for (j = 0; j <= gen.length; j++) ng[j] = (gen[j] || 0) ^ mul(gen[j - 1] || 0, EXP[i]); gen = ng; }
+    // gen[0] هو معامل x^n (=1) بترتيب تنازلي بعد الضرب أدناه
+    function rs(d) { var r = []; for (var q = 0; q < ecn; q++) r.push(0); d.forEach(function (b) { var f = b ^ r.shift(); r.push(0); for (var z = 0; z < ecn; z++) r[z] ^= mul(gen[z + 1], f); }); return r; }
+    var blocks = [], pos = 0;
+    for (i = 0; i < tv[1] + tv[3]; i++) { var len = i < tv[1] ? tv[2] : tv[4], d = data.slice(pos, pos + len); pos += len; blocks.push({ d: d, e: rs(d) }); }
+    var out = [], maxd = Math.max(tv[2], tv[4]);
+    for (i = 0; i < maxd; i++) blocks.forEach(function (b) { if (i < b.d.length) out.push(b.d[i]); });
+    for (i = 0; i < ecn; i++) blocks.forEach(function (b) { out.push(b.e[i]); });
+    var M = [], F = [];
+    for (i = 0; i < size; i++) { M.push([]); F.push([]); for (j = 0; j < size; j++) { M[i].push(false); F[i].push(false); } }
+    function fn(x, y, d) { M[y][x] = d; F[y][x] = true; }
+    for (i = 0; i < size; i++) { fn(6, i, i % 2 === 0); fn(i, 6, i % 2 === 0); }
+    [[3, 3], [size - 4, 3], [3, size - 4]].forEach(function (c) {
+      for (var dy = -4; dy <= 4; dy++) for (var dx = -4; dx <= 4; dx++) {
+        var x = c[0] + dx, y = c[1] + dy, dist = Math.max(Math.abs(dx), Math.abs(dy));
+        if (x >= 0 && x < size && y >= 0 && y < size) fn(x, y, dist !== 2 && dist !== 4);
+      }
+    });
+    var al = AL[v];
+    al.forEach(function (cy, a) { al.forEach(function (cx, b) {
+      if ((a === 0 && b === 0) || (a === 0 && b === al.length - 1) || (a === al.length - 1 && b === 0)) return;
+      for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++) fn(cx + dx, cy + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }); });
+    function fmt(mask) {
+      var d = mask, rem = d << 10; for (var q = 14; q >= 10; q--) if ((rem >>> q) & 1) rem ^= 0x537 << (q - 10);
+      var bt = ((d << 10) | rem) ^ 0x5412, g = function (n) { return ((bt >>> n) & 1) === 1; };
+      for (var q2 = 0; q2 <= 5; q2++) fn(8, q2, g(q2)); fn(8, 7, g(6)); fn(8, 8, g(7)); fn(7, 8, g(8));
+      for (q2 = 9; q2 < 15; q2++) fn(14 - q2, 8, g(q2));
+      for (q2 = 0; q2 < 8; q2++) fn(size - 1 - q2, 8, g(q2));
+      for (q2 = 8; q2 < 15; q2++) fn(8, size - 15 + q2, g(q2));
+      fn(8, size - 8, true);
+    }
+    fmt(0);
+    if (v >= 7) { var vb = VI[v]; for (i = 0; i < 18; i++) { var bt2 = ((vb >>> i) & 1) === 1, a2 = size - 11 + (i % 3), b2 = Math.floor(i / 3); fn(a2, b2, bt2); fn(b2, a2, bt2); } }
+    var n = 0;
+    for (var right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (var vert = 0; vert < size; vert++) for (j = 0; j < 2; j++) {
+        var x2 = right - j, up = ((right + 1) & 2) === 0, y2 = up ? size - 1 - vert : vert;
+        if (!F[y2][x2] && n < out.length * 8) { M[y2][x2] = ((out[n >>> 3] >>> (7 - (n & 7))) & 1) === 1; n++; }
+      }
+    }
+    var MS = [function (r, c) { return (r + c) % 2 === 0; }, function (r) { return r % 2 === 0; }, function (r, c) { return c % 3 === 0; }, function (r, c) { return (r + c) % 3 === 0; },
+      function (r, c) { return (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0; }, function (r, c) { return (r * c) % 2 + (r * c) % 3 === 0; },
+      function (r, c) { return ((r * c) % 2 + (r * c) % 3) % 2 === 0; }, function (r, c) { return ((r + c) % 2 + (r * c) % 3) % 2 === 0; }];
+    function pen(m) {
+      var p = 0, dark = 0, r, c, run, line;
+      function lines(get) {
+        for (var a = 0; a < size; a++) {
+          run = 1; line = '';
+          for (var b = 0; b < size; b++) { var cur = get(a, b); line += cur ? '1' : '0'; if (b > 0 && cur === get(a, b - 1)) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else run = 1; }
+          var re = /1011101/g, mm; while ((mm = re.exec(line))) { var before = line.slice(Math.max(0, mm.index - 4), mm.index), after = line.slice(mm.index + 7, mm.index + 11); if (before === '0000' || after === '0000') p += 40; re.lastIndex = mm.index + 1; }
+        }
+      }
+      lines(function (a, b) { return m[a][b]; }); lines(function (a, b) { return m[b][a]; });
+      for (r = 0; r < size; r++) for (c = 0; c < size; c++) { if (m[r][c]) dark++; if (r < size - 1 && c < size - 1 && m[r][c] === m[r][c + 1] && m[r][c] === m[r + 1][c] && m[r][c] === m[r + 1][c + 1]) p += 3; }
+      return p + 10 * Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size));
+    }
+    var best = null, bm = 0;
+    for (var mk = 0; mk < 8; mk++) {
+      var C = M.map(function (row, y) { return row.map(function (val, x) { return F[y][x] ? val : (val !== MS[mk](y, x)); }); });
+      var sc = pen(C); if (best === null || sc < best.s) { best = { s: sc, m: C }; bm = mk; }
+    }
+    M = best.m; fmt(bm);
+    return M;
+  }
+
+  function shareUrl() {
+    try {
+      if (window.__SHARE) return window.__SHARE;
+      var l = window.location;
+      if (!/^https?:$/.test(l.protocol) || /^(localhost|127\.|capacitor)/.test(l.hostname)) return '';
+      return l.origin + l.pathname.replace(/index\.html$/, '');
+    } catch (e) { return ''; }
+  }
+  function qrPath(m, q) {
+    var d = '';
+    m.forEach(function (row, y) { var x = 0; while (x < row.length) { if (row[x]) { var e = x; while (e < row.length && row[e]) e++; d += 'M' + (x + q) + ' ' + (y + q) + 'h' + (e - x) + 'v1h-' + (e - x) + 'z'; x = e; } else x++; } });
+    return d;
+  }
+  function ShareCard() {
+    var url = shareUrl(); if (!url) return null;
+    var m = wsQR(url); if (!m) return null;
+    var q = 3, N = m.length + q * 2, d = qrPath(m, q);
+    function note(t) { try { WS.notify(t); } catch (e) {} }
+    function copy() {
+      var done = function () { note('تم نسخ الرابط'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(url).then(done).catch(fallback); } else fallback();
+      function fallback() { try { var t = document.createElement('textarea'); t.value = url; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); done(); } catch (e) { note('انسخ الرابط يدوياً'); } }
+    }
+    function share() {
+      if (navigator.share) navigator.share({ title: 'وصّلني', text: 'اطلب من وصّلني — توصيل سريع في البصرة', url: url }).catch(function () {});
+      else copy();
+    }
+    function save() {
+      try {
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + N + ' ' + N + '" width="800" height="800"><rect width="' + N + '" height="' + N + '" fill="#fff"/><path d="' + d + '" fill="#14233c"/></svg>';
+        var img = new Image();
+        img.onload = function () {
+          var c = document.createElement('canvas'); c.width = 800; c.height = 800; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 800, 800); x.drawImage(img, 0, 0, 800, 800);
+          c.toBlob(function (b) { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'wasselni-qr.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); });
+        };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      } catch (e) { note('تعذّر حفظ الصورة'); }
+    }
+    return h('div', { className: 'wl2-card wl-share' },
+      h('div', { className: 'wl2-h' }, '🔗 شارك وصّلني مع أصدقائك'),
+      h('div', { className: 'small muted' }, 'امسح الباركود بالكاميرا أو أرسل الرابط'),
+      h('svg', { className: 'wl-qr', viewBox: '0 0 ' + N + ' ' + N, shapeRendering: 'crispEdges', role: 'img', 'aria-label': 'باركود رابط التطبيق' }, h('rect', { width: N, height: N, fill: '#fff' }), h('path', { d: d, fill: '#14233c' })),
+      h('div', { className: 'wl-lnk', onClick: copy }, url),
+      h('div', { className: 'wl-acts', style: { justifyContent: 'center' } },
+        h('button', { type: 'button', className: 'btn sm', onClick: share }, '📤 مشاركة'),
+        h('button', { type: 'button', className: 'btn sm ghost', onClick: copy }, '📋 نسخ الرابط'),
+        h('button', { type: 'button', className: 'btn sm ghost', onClick: save }, '⬇️ حفظ الباركود')));
   }
   function SupportCard(p) {
     var R_ = R(), op = R_.useState(false), un = R_.useState(0), kind = p.kind;
