@@ -1,0 +1,18 @@
+name: Keep Supabase alive
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query the database
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            -H 'apikey: sb_publishable_8dYyp8G1rU68iZaLOZstlw_TeSaPV77' \
+            'https://gvsuenendqtbutesncll.supabase.co/rest/v1/products?select=id&limit=1')
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          if [ "$code" != "200" ]; then echo "::error::Supabase did not answer 200 (maybe paused). Open the dashboard and press Resume project."; exit 1; fi
